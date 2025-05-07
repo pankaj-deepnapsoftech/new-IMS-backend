@@ -15,7 +15,8 @@ const invoiceRoutes = require("./routes/invoice");
 const productionProcessRoutes = require("./routes/productionProcess");
 const paymentRoutes = require("./routes/payment");
 const scrapRoutes = require("./routes/scrap");
-
+const salesRoutes = require("./routes/sales");
+const AssinedRoutes = require("./routes/Assined.routes");
 const app = express();
 
 // require('dotenv').config({ path: `.env.${process.env.NODE_ENV}` })
@@ -64,7 +65,8 @@ app.use("/api/invoice", invoiceRoutes);
 app.use("/api/production-process", productionProcessRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/scrap", scrapRoutes);
-
+app.use("/api/sale", salesRoutes);
+app.use("/api/assined", AssinedRoutes);
 app.use(globalErrorHandler);
 
 app.listen(process.env.PORT, () => {
