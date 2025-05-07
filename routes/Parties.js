@@ -8,7 +8,8 @@ const routes  = Router();
 
 
 routes.route("/create").post(isAuthenticated,Validater(PartiesValidation),CreateParties)
-routes.route("/create").post(isAuthenticated,GetParties)
+routes.route("/get").get(isAuthenticated,GetParties)
+routes.route("/delete").delete(isAuthenticated,GetParties)
 
 
 module.exports = routes
