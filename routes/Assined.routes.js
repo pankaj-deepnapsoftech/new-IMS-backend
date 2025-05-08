@@ -2,7 +2,7 @@ const { Router } = require("express");
 const { assinedTask, getAssinedTask, updateAssinedTask, DeleteAssinedTask, UpdateDesignStatus, CountTotal } = require("../controllers/assined.controller");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 const { Validater } = require("../helper/checkvalidation");
-const { assinedValidation } = require("../validations/purchase.validation");
+const { assinedValidation } = require("../validation/purchase.validation");
 
 const routes = Router();
 

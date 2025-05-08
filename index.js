@@ -70,7 +70,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/scrap", scrapRoutes);
 app.use("/api/sale", salesRoutes);
 app.use("/api/assined", AssinedRoutes);
-app.use("/api/parties",PartiesRoutes)
+app.use("/api/parties",PartiesRoutes);
 
 app.use(globalErrorHandler);
 
