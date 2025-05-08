@@ -11,18 +11,15 @@ const router = express.Router();
 // router.get("/all", isAuthenticated, all);
 // router.get("/wip", isAuthenticated, workInProgressProducts);
 // router.get("/unapproved", isAuthenticated, isSuper, unapproved);
-router.post("/create", isAuthenticated, Imageupload.fields([
-    { name: 'productFile', maxCount: 1 },
-    { name: 'performaInvoice', maxCount: 1 }
-]), create);
+router.post("/create", isAuthenticated, create);
 // router.get("/:id", isAuthenticated, isAllowed, details);
 
-route.put(
+router.put(
     "/update/:id",
     isAuthenticated,
     update
 );
 
-route.get("/getAll", isAuthenticated, getAll);
+router.get("/getAll", isAuthenticated, getAll);
 
 module.exports = router;

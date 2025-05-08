@@ -28,7 +28,7 @@ exports.GetParties = TryCatch(async (req,res) => {
     })
 });
 
-export const DeleteParties = TryCatch(async (req,res) => {
+exports.DeleteParties = TryCatch(async (req,res) => {
     const {id} = req.params;
     const find = await PartiesModels.findById(id);
     if(find){
