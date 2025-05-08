@@ -17,12 +17,13 @@ router.post("/create", isAuthenticated, Imageupload.fields([
 ]), create);
 // router.get("/:id", isAuthenticated, isAllowed, details);
 
-route.put(
+router.post(
     "/update/:id",
     isAuthenticated,
     update
 );
 
-route.get("/getAll", isAuthenticated, getAll);
+router.get("/getAll", isAuthenticated, getAll);
 
 module.exports = router;
+//
