@@ -39,3 +39,6 @@ exports.upload = multer({
         cb(new Error('Only .xlsx, .xls and .csv format allowed!'));
     }
 });
+
+
+exports.Imageupload = multer({ storage: storage })

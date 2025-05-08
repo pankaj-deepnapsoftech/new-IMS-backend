@@ -1,0 +1,28 @@
+const express = require("express");
+const { create, update, getAll } = require("../controllers/sales");
+const { isAuthenticated } = require("../middlewares/isAuthenticated");
+// const { isSuper } = require("../middlewares/isSuper");
+// const { isAllowed } = require("../middlewares/isAllowed");
+const { Imageupload } = require("../utils/upload");
+
+const router = express.Router();
+
+// router.route("/").post(isAuthenticated, isAllowed, create).put(isAuthenticated, isAllowed, update).delete(isAuthenticated, isAllowed, remove);
+// router.get("/all", isAuthenticated, all);
+// router.get("/wip", isAuthenticated, workInProgressProducts);
+// router.get("/unapproved", isAuthenticated, isSuper, unapproved);
+router.post("/create", isAuthenticated, Imageupload.fields([
+    { name: 'productFile', maxCount: 1 },
+    { name: 'performaInvoice', maxCount: 1 }
+]), create);
+// router.get("/:id", isAuthenticated, isAllowed, details);
+
+route.put(
+    "/update/:id",
+    isAuthenticated,
+    update
+);
+
+route.get("/getAll", isAuthenticated, getAll);
+
+module.exports = router;
