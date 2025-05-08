@@ -14,3 +14,9 @@ exports.PartiesValidation = object({
         .required("Phone number is a required field"),
 
 //
+    // type: string()
+    //     .oneOf(['admin', 'user', 'guest'], "Type must be one of: admin, user, guest")
+    //     .required("Type is a required field"),
+    type: string().required("Type is a required field"),
+});
+//
