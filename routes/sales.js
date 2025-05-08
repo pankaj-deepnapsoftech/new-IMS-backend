@@ -1,8 +1,8 @@
 const express = require("express");
-const { create, update, getAll } = require("../controllers/sales");
+const { create, update, getAll, getOne } = require("../controllers/sales");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 // const { isSuper } = require("../middlewares/isSuper");
-// const { isAllowed } = require("../middlewares/isAllowed");
+const { isAllowed } = require("../middlewares/isAllowed");
 const { Imageupload } = require("../utils/upload");
 
 const router = express.Router();
@@ -14,13 +14,14 @@ const router = express.Router();
 router.post("/create", isAuthenticated, create);
 // router.get("/:id", isAuthenticated, isAllowed, details);
 
-router.post(
+router.patch(
     "/update/:id",
     isAuthenticated,
     update
 );
 
 router.get("/getAll", isAuthenticated, getAll);
+router.get("/getOne", isAuthenticated, getOne);
 
 module.exports = router;
 //

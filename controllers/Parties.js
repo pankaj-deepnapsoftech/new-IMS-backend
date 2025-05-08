@@ -36,7 +36,7 @@ exports.DeleteParties = TryCatch(async (req,res) => {
 
     await PartiesModels.findByIdAndDelete(id);
     return res.status(200).json({
-        message:"Parie Deleted"
+        message:"Party Deleted"
     })
 })
 

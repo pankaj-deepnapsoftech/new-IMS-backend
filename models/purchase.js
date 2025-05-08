@@ -3,9 +3,9 @@ const { Schema, model } = require("mongoose");
 const Purchases = new Schema(
     {
         user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
-        customer_id: {
+        party: {
             type: Schema.Types.ObjectId,
-            ref: "Customer",
+            ref: "Parties",
             required: true,
         },
         product_id: { type: Schema.Types.ObjectId, ref: "Product", required: true },
