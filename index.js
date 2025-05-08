@@ -31,6 +31,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "http://localhost:5173",
   "https://inventory.deepmart.shop",
+  "https://sopasb2b.deepmart.shop",
 ];
 
 const corsOptions = {
@@ -40,7 +41,7 @@ const corsOptions = {
     } else {
       callback(new Error("Not allowed by CORS"));
     }
-  },
+  }, 
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   allowedHeaders: "Authorization,Content-Type",
   preflightContinue: false,
@@ -71,3 +72,4 @@ app.listen(process.env.PORT, () => {
   console.log(`Server is listening on Port: ${process.env.PORT}`);
   connectDB();
 });
+// hello
