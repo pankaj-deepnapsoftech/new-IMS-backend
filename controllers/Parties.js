@@ -2,15 +2,14 @@ const { PartiesModels } = require("../models/Parties");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 
 exports.CreateParties = TryCatch(async (req,res)=>{
-    const data = req.data;
-
+    const data = req.body;
     const find = await PartiesModels.findOne({email:data.email});
     if(find){
         throw new ErrorHandler('Party already register', 400);
     }
-    const result = await PartiesModels.create(req.data)
+    const result = await PartiesModels.create(data)
     return res.status(201).json({
-        message:"Party adied",
+        message:"Party added successfully",
         result
     })
 });
@@ -41,7 +40,7 @@ exports.DeleteParties = TryCatch(async (req,res) => {
     })
 })
 
-export const UpdateParties = TryCatch(async (req,res)=>{
+exports.UpdateParties = TryCatch(async (req,res)=>{
     const data = req.body;
     const {id} = req.params;
     const find = await PartiesModels.findById(id);
