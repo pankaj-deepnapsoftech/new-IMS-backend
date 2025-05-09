@@ -30,8 +30,8 @@ exports.GetParties = TryCatch(async (req,res) => {
 exports.DeleteParties = TryCatch(async (req,res) => {
     const {id} = req.params;
     const find = await PartiesModels.findById(id);
-    if(find){
-        throw new ErrorHandler('Party already register', 400);
+    if(!find){
+        throw new ErrorHandler(' Party not found ', 400);
     }
 
     await PartiesModels.findByIdAndDelete(id);
