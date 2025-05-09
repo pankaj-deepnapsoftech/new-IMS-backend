@@ -18,5 +18,6 @@ exports.PartiesValidation = object({
     //     .oneOf(['admin', 'user', 'guest'], "Type must be one of: admin, user, guest")
     //     .required("Type is a required field"),
     type: string().required("Type is a required field"),
+    parties_type:string().required("Parties Type is a required field")
 });
 //
