@@ -13,4 +13,5 @@ exports.PartiesValidation = object({
         .matches(/^\+?[1-9]\d{1,14}$/, "Must be a valid phone number")
         .required("Phone number is a required field"),
 
-//
+    party_type: string().required("Party type field is required"),
+})
