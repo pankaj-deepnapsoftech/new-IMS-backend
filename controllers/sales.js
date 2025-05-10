@@ -222,10 +222,10 @@ exports.getOne = TryCatch(async (req, res) => {
         },
         {
             $lookup: {
-                from: "customers",
-                localField: "customer_id",
+                from: "parties",
+                localField: "party",
                 foreignField: "_id",
-                as: "customer_id",
+                as: "party_id",
                 pipeline: [
                     {
                         $project: {
