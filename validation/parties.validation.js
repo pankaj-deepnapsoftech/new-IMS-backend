@@ -1,10 +1,10 @@
 const { object, string } = require('yup');
 
 exports.PartiesValidation = object({
-    full_name: string()
-        .required("Full name is a required field")
-        .min(2, "Full name must be at least 2 characters long")
-        .max(100, "Full name must be at most 100 characters long"),
+    // full_name: string()
+    //     .required("Full name is a required field")
+    //     .min(2, "Full name must be at least 2 characters long")
+    //     .max(100, "Full name must be at most 100 characters long"),
     email: string()
         .email("Must be a valid email")
         .required("Email is a required field"),

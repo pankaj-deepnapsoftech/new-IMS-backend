@@ -44,8 +44,8 @@ exports.UpdateParties = TryCatch(async (req,res)=>{
     const data = req.body;
     const {id} = req.params;
     const find = await PartiesModels.findById(id);
-    if(find){
-        throw new ErrorHandler('Party already register', 400);
+    if(!find){
+        throw new ErrorHandler('Party not register', 400);
     }
     await PartiesModels.findByIdAndUpdate(id,data)
     return res.status(200).json({
