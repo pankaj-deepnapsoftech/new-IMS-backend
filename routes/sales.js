@@ -1,5 +1,5 @@
 const express = require("express");
-const { create, update, getAll, getOne } = require("../controllers/sales");
+const { create, update, getAll, getOne, AddToken, uploadinvoice } = require("../controllers/sales");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 // const { isSuper } = require("../middlewares/isSuper");
 const { isAllowed } = require("../middlewares/isAllowed");
@@ -14,11 +14,20 @@ const router = express.Router();
 router.post("/create", isAuthenticated, create);
 // router.get("/:id", isAuthenticated, isAllowed, details);
 
-router.patch(
+router.put(
     "/update/:id",
     isAuthenticated,
     update
 );
+
+router.patch(
+    "/upload-invoice/:id",
+    isAuthenticated,
+    Imageupload.single("invoice"),
+    uploadinvoice
+);
+
+router.patch("/addToken/:id", isAuthenticated, AddToken);
 
 router.get("/getAll", isAuthenticated, getAll);
 router.get("/getOne", isAuthenticated, getOne);

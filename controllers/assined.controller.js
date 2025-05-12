@@ -10,6 +10,8 @@ const assinedTask = TryCatch(async (req, res) => {
       message:"task is already assined"
     })
   }
+  console.log('assign task data', data);
+  console.log('assign task data =', req?.user._id); 
   const value = await AssinedModel.create({...data,assined_by:req?.user._id});
 
   // await Notification.create({
@@ -73,10 +75,10 @@ const getAssinedTask = TryCatch(async (req, res) => {
         },  
         {
           $lookup:{
-            from:"customers",
-            localField:"customer_id",
-            foreignField:"_id",
-            as:"customer_id"
+            from: "parties",
+            localField: "party",
+            foreignField: "_id",
+            as: "party_id",
           }
         },
         {
@@ -195,6 +197,9 @@ const CountTotal = TryCatch(async (req,res) => {
     res.status(500).json({ error: 'Server Error' });
   }
 });
+
+
+
 
 module.exports = {
   assinedTask,

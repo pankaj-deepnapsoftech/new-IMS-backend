@@ -156,6 +156,31 @@ exports.getAll = TryCatch(async (req, res) => {
     return res.status(200).json({ message: "all purchases order found", data });
 });
 
+exports.AddToken = TryCatch(async (req, res) => {
+    const { id } = req.params;
+    const { token_amt } = req.body;
+
+    if (!token_amt) {
+        return res.status(404).json({
+            message: "token amount is required!",
+        });
+    }
+
+    if (!id) {
+        return res.status(404).json({
+            message: "couldn't access the sale!",
+        });
+    }
+
+    await Purchase.findByIdAndUpdate(id, {
+        token_amt,
+        token_status: false,
+    });
+
+    return res.status(200).json({
+        message: "Token Amount added for sample :)",
+    });
+});
 
 exports.getOne = TryCatch(async (req, res) => {
     const id = req.user._id;
@@ -286,6 +311,39 @@ exports.getOne = TryCatch(async (req, res) => {
         .exec();
     return res.status(200).json({ message: "data found by id", data }); 
 });
+
+
+exports.uploadinvoice = TryCatch(async (req, res) => {
+    try {
+        const { invoice_remark } = req.body;
+        const { id } = req.params;
+        const { filename } = req.file;
+        const find = await Purchase.findById(id);
+        if (!find) {
+            return res.status(404).json({
+                message: "data not found try again",
+            });
+        }
+
+        const path = `https://rtpasbackend.deepmart.shop/images/${filename}`;
+
+        await Purchase.findByIdAndUpdate(id, { invoice: path, invoice_remark: invoice_remark });
+
+        // await AssinedModel.findByIdAndUpdate(assined_to, {
+        //   isCompleted: "Completed",
+        //   assinedto_comment,
+        // });
+
+        return res.status(201).json({
+            message: "file uploaded successful",
+        });
+    } catch (err) {
+        return res.status(500).json({
+            message: err,
+        });
+    }    
+});
+
 
 
 
