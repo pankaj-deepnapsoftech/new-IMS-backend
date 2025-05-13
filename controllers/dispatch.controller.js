@@ -35,9 +35,17 @@ exports.GetDispatch = TryCatch(async (req, res) => {
                     {
                         $lookup:{
                             from:"parties",
-                            localField:"customer_id",
+                            localField:"party",
                             foreignField:"_id",
                             as:"customer_id"
+                        }
+                    },
+                    {
+                        $lookup:{
+                            from:"products",
+                            localField:"product_id",
+                            foreignField:"_id",
+                            as:"product_id"
                         }
                     }
                 ]
