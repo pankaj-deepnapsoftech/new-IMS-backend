@@ -20,7 +20,7 @@ router.put(
     update
 );
 
-router.patch(
+router.put(
     "/upload-invoice/:id",
     isAuthenticated,
     Imageupload.single("invoice"),

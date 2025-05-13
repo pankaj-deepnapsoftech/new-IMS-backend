@@ -1,7 +1,7 @@
 
 const { Router } = require("express");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
-const { CreateDispatch, DeleteDispatch, GetDispatch } = require("../controllers/dispatch.controller");
+const { CreateDispatch, DeleteDispatch, GetDispatch, UpdateDispatch } = require("../controllers/dispatch.controller");
 
 const routes = Router();
 

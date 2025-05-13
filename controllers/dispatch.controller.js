@@ -1,5 +1,5 @@
 const { DispatchModel } = require("../models/Dispatcher");
-const { TryCatch } = require("../utils/error");
+const { TryCatch, ErrorHandler } = require("../utils/error");
 
 
 exports.CreateDispatch = TryCatch(async (req, res) => {
