@@ -6,7 +6,7 @@ const {
   update,
   remove,
   all,
-  markDone,
+  markDone
 } = require("../controllers/process");
 const router = express.Router();
 
@@ -17,4 +17,5 @@ router.route("/:_id")
   .get(isAuthenticated, details)
   .put(isAuthenticated, update)
   .delete(isAuthenticated, remove);
+
 module.exports = router;
