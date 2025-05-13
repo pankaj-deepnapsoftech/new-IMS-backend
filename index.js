@@ -17,8 +17,7 @@ const paymentRoutes = require("./routes/payment");
 const scrapRoutes = require("./routes/scrap");
 const salesRoutes = require("./routes/sales");
 const AssinedRoutes = require("./routes/Assined.routes");
-const PartiesRoutes = require("./routes/Parties");
-const DispatchRoutes  = require("./routes/Dispatch.routes");
+const PartiesRoutes = require("./routes/Parties")
 
 const app = express();
 
@@ -71,8 +70,7 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/scrap", scrapRoutes);
 app.use("/api/sale", salesRoutes);
 app.use("/api/assined", AssinedRoutes);
-app.use("/api/parties", PartiesRoutes);
-app.use("/api/dispatch", DispatchRoutes);
+app.use("/api/parties",PartiesRoutes);
 
 app.use(globalErrorHandler);
 
