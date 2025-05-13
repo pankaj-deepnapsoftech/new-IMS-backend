@@ -24,9 +24,28 @@ exports.GetDispatch = TryCatch(async (req, res) => {
     const pages = parseInt(page) || 1;
     const limits = parseInt(limit) || 10;
     const skip = (pages - 1) * limits;
-    const data = await DispatchModel.find({creator:req.user?._id}).populate("Sale_id").sort({_id:-1}).skip(skip).limit(limits);
+    const data = await DispatchModel.aggregate([
+        {
+            $lookup:{
+                from:"purchases",
+                localField:"Sale_id",
+                foreignField:"_id",
+                as:"Sale_id",
+                pipeline:[
+                    {
+                        $lookup:{
+                            from:"parties",
+                            localField:"customer_id",
+                            foreignField:"_id",
+                            as:"customer_id"
+                        }
+                    }
+                ]
+            }
+        }
+    ]).sort({ _id: -1 }).skip(skip).limit(limits);
     return res.status(200).json({
-        message:"Data",
+        message: "Data",
         data
     })
 });
