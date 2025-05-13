@@ -312,7 +312,6 @@ exports.getOne = TryCatch(async (req, res) => {
     return res.status(200).json({ message: "data found by id", data }); 
 });
 
-
 exports.uploadinvoice = TryCatch(async (req, res) => {
     try {
         const { invoice_remark } = req.body;
@@ -344,6 +343,48 @@ exports.uploadinvoice = TryCatch(async (req, res) => {
     }    
 });
 
+
+exports.Delivered = TryCatch(async (req, res) => {
+    const { filename } = req.file;
+    const { id } = req.params;
+
+    if (!filename) {
+        return res.status(404).json({
+            message: "file not found",
+        });
+    }
+
+    const data = await Purchase.findById(id);
+    try {
+        if (!data) {
+            return res.status(404).json({
+                message: "data not found",
+            });
+        }
+
+        const path = `https://rtpasbackend.deepmart.shop/images/${filename}`;
+        console.log('req.body.role=', req.body.role)
+        if (req.body.role = 'Dispatcher') {
+            await Purchase.findByIdAndUpdate(id, {
+                dispatcher_order_ss: path,
+                product_status: "Delivered",
+            });
+        } else {
+            await Purchase.findByIdAndUpdate(id, {
+                customer_order_ss: path,
+                product_status: "Delivered",
+            });
+        }
+        return res.status(200).json({
+            message: "file uploaded successful",
+        });
+
+    } catch (err) {
+        return res.status(500).json({
+            message: err,
+        });
+    }
+});
 
 
 
