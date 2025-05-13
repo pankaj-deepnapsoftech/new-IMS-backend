@@ -19,17 +19,36 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
 
 });
 
-// exports.GetDispatch = TryCatch(async (req, res) => {
-//     const { page, limit } = req.query;
-//     const pages = parseInt(page) || 1;
-//     const limits = parseInt(limit) || 10;
-//     const skip = (pages - 1) * limits;
-//     const data = await AssinedModel.find({assined_to:req.user?._id}).populate("sale_id").sort({_id:-1}).skip(skip).limit(limits);
-//     return res.status(200).json({
-//         message:"Data",
-//         data
-//     });
-// });
+exports.GetDispatch = TryCatch(async (req, res) => {
+    const { page, limit } = req.query;
+    const pages = parseInt(page) || 1;
+    const limits = parseInt(limit) || 10;
+    const skip = (pages - 1) * limits;
+    const data = await DispatchModel.aggregate([
+        {
+            $lookup:{
+                from:"purchases",
+                localField:"Sale_id",
+                foreignField:"_id",
+                as:"Sale_id",
+                pipeline:[
+                    {
+                        $lookup:{
+                            from:"parties",
+                            localField:"customer_id",
+                            foreignField:"_id",
+                            as:"customer_id"
+                        }
+                    }
+                ]
+            }
+        }
+    ]).sort({ _id: -1 }).skip(skip).limit(limits);
+    return res.status(200).json({
+        message: "Data",
+        data
+    })
+});
 
 exports.DeleteDispatch = TryCatch(async (req, res) => {
     const { id } = req.params;
