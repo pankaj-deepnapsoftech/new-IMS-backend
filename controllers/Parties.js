@@ -20,10 +20,12 @@ exports.GetParties = TryCatch(async (req,res) => {
     const pages = parseInt(page) || 1;
     const limits = parseInt(limit) || 10;
     const skip = (pages - 1 ) * limits;
+    const totalData = await PartiesModels.find().countDocuments();
     const  data = await PartiesModels.find({}).sort({_id:-1}).skip(skip).limit(limits);
     return res.status(200).json({
         message:"Data",
-        data
+        data,
+        totalData
     })
 });
 
