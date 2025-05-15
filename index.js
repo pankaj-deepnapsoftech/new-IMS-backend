@@ -56,7 +56,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authRoutes); 
 app.use("/api/product", productRoutes);
 app.use("/api/store", storeRoutes);
 app.use("/api/agent", agentRoutes);
