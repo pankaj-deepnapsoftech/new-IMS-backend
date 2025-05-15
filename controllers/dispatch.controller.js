@@ -24,29 +24,29 @@ exports.GetDispatch = TryCatch(async (req, res) => {
     const pages = parseInt(page) || 1;
     const limits = parseInt(limit) || 10;
     const skip = (pages - 1) * limits;
-    const totalData = await PartiesModels.find().countDocuments();
+    const totalData = await DispatchModel.find().countDocuments();
     const data = await DispatchModel.aggregate([
         {
-            $lookup:{
-                from:"purchases",
-                localField:"Sale_id",
-                foreignField:"_id",
-                as:"Sale_id",
-                pipeline:[
+            $lookup: {
+                from: "purchases",
+                localField: "Sale_id",
+                foreignField: "_id",
+                as: "Sale_id",
+                pipeline: [
                     {
-                        $lookup:{
-                            from:"parties",
-                            localField:"party",
-                            foreignField:"_id",
-                            as:"customer_id"
+                        $lookup: {
+                            from: "parties",
+                            localField: "party",
+                            foreignField: "_id",
+                            as: "customer_id"
                         }
                     },
                     {
-                        $lookup:{
-                            from:"products",
-                            localField:"product_id",
-                            foreignField:"_id",
-                            as:"product_id"
+                        $lookup: {
+                            from: "products",
+                            localField: "product_id",
+                            foreignField: "_id",
+                            as: "product_id"
                         }
                     }
                 ]
@@ -55,7 +55,7 @@ exports.GetDispatch = TryCatch(async (req, res) => {
     ]).sort({ _id: -1 }).skip(skip).limit(limits);
     return res.status(200).json({
         message: "Data",
-        data,
+        data, 
         totalData
     })
 });
