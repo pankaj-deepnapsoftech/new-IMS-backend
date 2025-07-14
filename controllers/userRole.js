@@ -15,7 +15,8 @@ exports.create = TryCatch(async (req, res) => {
   });
 });
 exports.edit = TryCatch(async (req, res) => {
-  const { _id, role, permissions } = req.body;
+  const { _id, role, description, permissions } = req.body;
+
   if (!_id) {
     throw new ErrorHandler("_id is a required field", 400);
   }
@@ -27,7 +28,7 @@ exports.edit = TryCatch(async (req, res) => {
 
   const roleUpdated = await UserRole.findByIdAndUpdate(
     { _id },
-    { $set: { role, permissions } },
+    { $set: { role, description, permissions } },
     { new: true }
   );
 
