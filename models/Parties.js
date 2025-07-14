@@ -11,6 +11,7 @@ const PartiesSchema = new Schema({
   shipped_to: { type: String, trim: true },
   bill_to: { type: String, trim: true },
   type: { type: String, required: true, trim: true },
+  company_name:{type:String,default:""},
   parties_type: { type: String, required: true, trim: true }
 }, { timestamps: true });
 
