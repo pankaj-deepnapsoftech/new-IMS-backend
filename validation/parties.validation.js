@@ -1,20 +1,14 @@
-const { object, string } = require('yup');
+const { object, string, array } = require("yup");
 
 exports.PartiesValidation = object({
-    // full_name: string()
-    //     .required("Full name is a required field")
-    //     .min(2, "Full name must be at least 2 characters long")
-    //     .max(100, "Full name must be at most 100 characters long"),
-    email: string()
-        .email("Must be a valid email")
-        .required("Email is a required field"),
-
-    phone: string()
-        .matches(/^\+?[1-9]\d{1,14}$/, "Must be a valid phone number")
-        .required("Phone number is a required field"),
-    // type: string()
-    //     .oneOf(['admin', 'user', 'guest'], "Type must be one of: admin, user, guest")
-    //     .required("Type is a required field"),
-    type: string().required("Type is a required field"),
-    parties_type:string().required("Parties Type is a required field")
+  consignee_name: array().of(string().required()).required("Consignee Name required"),
+  gst_add: string().required("GST ADD is required"),
+  gst_in: array().of(string().required("GST IN is required")).min(1),
+  contact_number: array().of(string().required()).required("Contact numbers required"),
+  delivery_address: array().of(string().required()).required("Delivery address required"),
+  email_id: array().of(string().email("Invalid email")).required("At least one email is required"),
+  shipped_to: string().required("Shipped To address is required"),
+  bill_to: string().required("Bill To address is required"),
+  type: string().required("Type is a required field"),
+  parties_type: string().required("Parties Type is a required field")
 });

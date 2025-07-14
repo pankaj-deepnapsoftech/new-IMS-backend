@@ -14,7 +14,8 @@ exports.globalErrorHandler = (err, req, res, next)=>{
     else if(err.name === "MongoServerError" && err.code === 11000){
         let message = '';
         if(err.message.includes('email')){
-            message = "Email Id is already registered";
+            message = err.message;
+            // console.log(err)
         }
         else if(err.message.includes('phone')){
             message = "Phone No. is already registered";

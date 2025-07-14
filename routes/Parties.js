@@ -13,4 +13,4 @@ routes.route("/delete/:id").delete(isAuthenticated, DeleteParties)
 routes.route("/put/:id").put(isAuthenticated,UpdateParties)
 
 
-module.exports = routes
+module.exports = routes 
