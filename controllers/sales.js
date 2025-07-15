@@ -8,7 +8,8 @@ exports.create = TryCatch(async (req, res) => {
     // const productFilePath = productFile              
     //   ? `https://rtpasbackend.deepmart.shop/images/${productFile.filename}`///
     //   : null;                                                            
-    const newData = {
+    const newData = { 
+        
       ...data,
       user_id: req?.user._id,
     //   productFile: productFilePath,
