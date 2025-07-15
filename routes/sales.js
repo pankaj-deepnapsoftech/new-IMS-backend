@@ -20,6 +20,8 @@ router.put(
     update
 );
 
+
+
 router.put(
     "/upload-invoice/:id",
     isAuthenticated,
@@ -37,5 +39,5 @@ router.patch(
     Imageupload.single("delivery"),
     Delivered
 );
-module.exports = router;
+module.exports = router; 
 //
