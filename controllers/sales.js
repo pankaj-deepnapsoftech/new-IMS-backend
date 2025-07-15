@@ -4,9 +4,14 @@ const { TryCatch, ErrorHandler } = require("../utils/error");
 exports.create = TryCatch(async (req, res) => {
   try {
     const data = req.body;
+    // const productFile = req.files?.productFile?.[0]; 
+    // const productFilePath = productFile              
+    //   ? `https://rtpasbackend.deepmart.shop/images/${productFile.filename}`///
+    //   : null;                                                            
     const newData = {
       ...data,
       user_id: req?.user._id,
+    //   productFile: productFilePath,
     };
     await Purchase.create(newData);
     return res.status(201).json({ message: "Purchase Order Generated" });
@@ -123,13 +128,13 @@ exports.getAll = TryCatch(async (req, res) => {
         from: "parties",
         localField: "party",
         foreignField: "_id",
-        
+
         as: "party",
         pipeline: [
           {
             $project: {
               consignee_name: 2,
-              contact_number:2,
+              contact_number: 2,
               cust_id: 1,
             },
           },

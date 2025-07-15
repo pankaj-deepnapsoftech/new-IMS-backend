@@ -12,6 +12,7 @@ const router = express.Router();
 // router.get("/wip", isAuthenticated, workInProgressProducts);
 // router.get("/unapproved", isAuthenticated, isSuper, unapproved);
 router.post("/create", isAuthenticated, create);
+
 // router.get("/:id", isAuthenticated, isAllowed, details);
 
 router.put(
