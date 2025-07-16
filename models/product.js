@@ -1,6 +1,7 @@
 const { Schema, model } = require("mongoose");
 
 const productSchema = new Schema({
+    
     inventory_category: {
         type: String,
         enum: ['direct', 'indirect'],

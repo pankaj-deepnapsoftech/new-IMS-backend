@@ -1,17 +1,27 @@
 const { Purchase } = require("../models/purchase");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 
+const generateorderId = async () => {
+  const lastParty = await Purchase.findOne().sort({ createdAt: -1 });
+ 
+  if (!lastParty) return "OID001";
+  const lastId = lastParty.order_id.replace("OID", "");
+  const nextId = Number(lastId) + 1;
+  return `OID${nextId.toString().padStart(3, "0")}`;
+};
+
 exports.create = TryCatch(async (req, res) => {
   try {
     const data = req.body;
+    const order_id = await generateorderId();
     // const productFile = req.files?.productFile?.[0]; 
     // const productFilePath = productFile              
     //   ? `https://rtpasbackend.deepmart.shop/images/${productFile.filename}`///
     //   : null;                                                            
     const newData = { 
-        
       ...data,
       user_id: req?.user._id,
+      order_id,
     //   productFile: productFilePath,
     };
     await Purchase.create(newData);
