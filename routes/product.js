@@ -14,3 +14,4 @@ router.post("/bulk", isAuthenticated, upload.single('excel'), bulkUploadHandler)
 router.get("/:id", isAuthenticated, isAllowed, details);
 
 module.exports = router;
+ 

@@ -6,15 +6,20 @@ const { checkProductCsvValidity } = require("../utils/checkProductCsvValidity");
 const BOMRawMaterial = require("../models/bom-raw-material");
 const ProductionProcess = require("../models/productionProcess");
 const BOM = require("../models/bom");
+const { generateProductId } = require("../utils/generateProductId");
 
 exports.create = TryCatch(async (req, res) => {
   const productDetails = req.body;
   if (!productDetails) {
     throw new ErrorHandler("Please provide product details", 400);
   }
+  const generatedId = await generateProductId(
+    productDetails.category
+  );
 
   const product = await Product.create({
     ...productDetails,
+    product_id: generatedId,
     approved: req.user.isSuper,
   });
 
@@ -116,7 +121,7 @@ exports.bulkUploadHandler = async (req, res) => {
     .fromFile(req.file.path)
     .then(async (response) => {
       try {
-        fs.unlink(req.file.path, () => { });
+        fs.unlink(req.file.path, () => {});
 
         await checkProductCsvValidity(response);
 
@@ -142,27 +147,36 @@ exports.workInProgressProducts = TryCatch(async (req, res) => {
   const products = [];
   const processes = await ProductionProcess.find({
     status: "work in progress",
-  }).populate({
-    path: "raw_materials",
-    populate: [
-      {
-        path: "item",
-      },
-    ],
-  }).populate({
-    path: "bom",
-    populate: [
-      {
-        path: "finished_good",
-        populate: {
-          path: "item"
-        }
-      }
-    ],
-  });
+  })
+    .populate({
+      path: "raw_materials",
+      populate: [
+        {
+          path: "item",
+        },
+      ],
+    })
+    .populate({
+      path: "bom",
+      populate: [
+        {
+          path: "finished_good",
+          populate: {
+            path: "item",
+          },
+        },
+      ],
+    });
 
-  processes.forEach(p => {
-    p.raw_materials.forEach(material => products.push({ ...material._doc, bom: p.bom, createdAt: p.createdAt, updatedAt: p.updatedAt }));
+  processes.forEach((p) => {
+    p.raw_materials.forEach((material) =>
+      products.push({
+        ...material._doc,
+        bom: p.bom,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+      })
+    );
   });
 
   res.status(200).json({
