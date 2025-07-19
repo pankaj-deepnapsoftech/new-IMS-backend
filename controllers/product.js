@@ -30,6 +30,7 @@ exports.create = TryCatch(async (req, res) => {
     product,
   });
 });
+
 exports.update = TryCatch(async (req, res) => {
   const productDetails = req.body;
   if (!productDetails) {

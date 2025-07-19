@@ -12,6 +12,7 @@ const Payment = require("../models/payment");
 const { TryCatch } = require("../utils/error");
 const BOMScrapMaterial = require("../models/bom-scrap-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
+const { Purchase } = require("../models/purchase");
 
 exports.summary = TryCatch(async (req, res) => {
   let { from, to } = req.body;
@@ -24,6 +25,11 @@ exports.summary = TryCatch(async (req, res) => {
       .set({ hour: 23, minute: 59, second: 59, millisecond: 999 })
       .format();
   }
+  const oneMonthAgoForBom = moment()
+    .subtract(1, "months")
+    .startOf("day")
+    .toDate();
+  const todayForBom = moment().endOf("day").toDate();
 
   // Products Summary
   const productsPipeline = [
@@ -36,12 +42,12 @@ exports.summary = TryCatch(async (req, res) => {
         max_stock: 1,
         price: 1,
         approved: 1,
-        inventory_category: 1
+        inventory_category: 1,
       },
     },
     {
       $group: {
-        _id: '$inventory_category',
+        _id: "$inventory_category",
         total_low_stock: {
           $sum: {
             $cond: [{ $lt: ["$current_stock", "$min_stock"] }, 1, 0],
@@ -82,7 +88,7 @@ exports.summary = TryCatch(async (req, res) => {
     });
   }
   const products = await Product.aggregate(productsPipeline);
-  
+
   // Scrap Materials Summary
   const scrapPipeline = [
     {
@@ -90,7 +96,7 @@ exports.summary = TryCatch(async (req, res) => {
         quantity: 1,
         total_part_cost: 1,
         createdAt: 1,
-        is_production_started: 1
+        is_production_started: 1,
       },
     },
     {
@@ -100,7 +106,7 @@ exports.summary = TryCatch(async (req, res) => {
           $sum: 1,
         },
         total_stock_price: {
-          $sum: '$total_part_cost',
+          $sum: "$total_part_cost",
         },
       },
     },
@@ -112,7 +118,7 @@ exports.summary = TryCatch(async (req, res) => {
         createdAt: {
           $gte: new Date(from),
           $lte: new Date(to),
-        }
+        },
       },
     });
   } else {
@@ -123,7 +129,7 @@ exports.summary = TryCatch(async (req, res) => {
     });
   }
   const scrap = await BOMScrapMaterial.aggregate(scrapPipeline);
-  
+
   // WIP Materials Summary
   const wipInventoryPipeline = [
     {
@@ -132,7 +138,7 @@ exports.summary = TryCatch(async (req, res) => {
         approvedByInventoryPersonnel: 1,
         in_production: 1,
         total_part_cost: 1,
-        createdAt: 1
+        createdAt: 1,
       },
     },
     {
@@ -142,7 +148,7 @@ exports.summary = TryCatch(async (req, res) => {
           $sum: 1,
         },
         total_stock_price: {
-          $sum: '$total_part_cost',
+          $sum: "$total_part_cost",
         },
       },
     },
@@ -157,7 +163,7 @@ exports.summary = TryCatch(async (req, res) => {
         },
         approvedByAdmin: true,
         approvedByInventoryPersonnel: true,
-        in_production: true
+        in_production: true,
       },
     });
   } else {
@@ -165,7 +171,7 @@ exports.summary = TryCatch(async (req, res) => {
       $match: {
         approvedByAdmin: true,
         approvedByInventoryPersonnel: true,
-        in_production: true
+        in_production: true,
       },
     });
   }
@@ -283,15 +289,15 @@ exports.summary = TryCatch(async (req, res) => {
   const processPipeline = [
     {
       $project: {
-        status: 1
+        status: 1,
       },
     },
     {
       $group: {
-        _id: '$status',
+        _id: "$status",
         total_process_count: {
           $sum: 1,
-        }
+        },
       },
     },
   ];
@@ -314,24 +320,144 @@ exports.summary = TryCatch(async (req, res) => {
     });
   }
   const process = await ProductionProcess.aggregate(processPipeline);
-  let processCountStatusWiseArr = process.map(p=>({[p._id]: p.total_process_count}));
+  let processCountStatusWiseArr = process.map((p) => ({
+    [p._id]: p.total_process_count,
+  }));
   const processCountStatusWiseObj = {};
-  processCountStatusWiseArr.forEach(obj => {
+  processCountStatusWiseArr.forEach((obj) => {
     const key = Object.keys(obj)[0];
     processCountStatusWiseObj[key] = obj[key];
   });
 
   // Proforma Invoices, Invoices and Payments Insights
   let condition = {};
-  if(from && to){
+  if (from && to) {
     condition = {
       $gte: from,
-      $lte: to
-    }
+      $lte: to,
+    };
   }
-  const totalProformaInvoices = await ProformaInvoice.find(condition).countDocuments();
+  const totalProformaInvoices = await ProformaInvoice.find(
+    condition
+  ).countDocuments();
   const totalInvoices = await Invoice.find(condition).countDocuments();
   const totalPayments = await Payment.find(condition).countDocuments();
+
+  // Invoices Total for Last 1 Month
+  const oneMonthAgo = moment().subtract(1, "months").startOf("day").toDate();
+  const today = moment().endOf("day").toDate();
+
+  const invoiceTotalAgg = await Invoice.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: oneMonthAgo,
+          $lte: today,
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: "$total" },
+      },
+    },
+  ]);
+
+  const invoiceTotalLastMonth =
+    invoiceTotalAgg.length > 0 ? invoiceTotalAgg[0].totalAmount : 0;
+  // Total Verified Employees Count
+  const totalVerifiedEmployees = await User.countDocuments({
+    isVerified: true,
+  });
+
+  const bomTotalAgg = await BOM.aggregate([
+    {
+      $match: {
+        approved: true,
+        createdAt: {
+          $gte: oneMonthAgoForBom,
+          $lte: todayForBom,
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalProductionAmount: { $sum: "$total_cost" },
+      },
+    },
+  ]);
+
+  const totalProductionAmount =
+    bomTotalAgg.length > 0 ? bomTotalAgg[0].totalProductionAmount : 0;
+
+  const totalSalesAgg = await Purchase.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: oneMonthAgo,
+          $lte: today,
+        },
+      },
+    },
+    {
+      $addFields: {
+        total_price: {
+          $add: [
+            { $multiply: ["$price", "$product_qty"] },
+            {
+              $divide: [
+                {
+                  $multiply: [
+                    { $multiply: ["$price", "$product_qty"] },
+                    "$GST",
+                  ],
+                },
+                100,
+              ],
+            },
+          ],
+        },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalSalesAmount: { $sum: "$total_price" },
+      },
+    },
+  ]);
+
+  const totalSalesAmount =
+    totalSalesAgg.length > 0 ? totalSalesAgg[0].totalSalesAmount : 0;
+
+  const oneMonthAgoProduct = moment()
+    .subtract(1, "months")
+    .startOf("day")
+    .toDate();
+  const todayProduct = moment().endOf("day").toDate();
+
+  const productBuyTotalAgg = await Product.aggregate([
+    {
+      $match: {
+        item_type: "buy",
+        inventory_category: { $in: ["direct", "indirect"] },
+        createdAt: { $gte: oneMonthAgoProduct, $lte: todayProduct },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalProductBuyPrice: { $sum: "$price" },
+      },
+    },
+  ]);
+
+  const totalProductBuyPriceLastMonth =
+    productBuyTotalAgg.length > 0
+      ? productBuyTotalAgg[0].totalProductBuyPrice
+      : 0;
 
   res.status(200).json({
     status: 200,
@@ -343,6 +469,7 @@ exports.summary = TryCatch(async (req, res) => {
     boms: {
       total_bom_count: bomCount,
     },
+
     merchants: merchants[0] || {
       total_supplier_count: 0,
       total_buyer_count: 0,
@@ -354,11 +481,27 @@ exports.summary = TryCatch(async (req, res) => {
       unapproved_bom_count: unapprovedBoms,
     },
     employees,
+    verified_employees_count: totalVerifiedEmployees,
+    total_production_amount: totalProductionAmount,
+    total_sales_amount: totalSalesAmount,
+    total_product_buy_price: totalProductBuyPriceLastMonth,
+
+
     processes: processCountStatusWiseObj,
     proforma_invoices: totalProformaInvoices,
+    invoice_summary: {
+      total_invoice_amount_last_month: invoiceTotalLastMonth,
+    },
+
     invoices: totalInvoices,
     payments: totalPayments,
-    scrap: scrap.length === 0 ? [{total_product_count: 0, total_stock_price: 0}] : scrap,
-    wip_inventory: wipInventory.length === 0 ? [{total_product_count: 0, total_stock_price: 0}] : wipInventory
+    scrap:
+      scrap.length === 0
+        ? [{ total_product_count: 0, total_stock_price: 0 }]
+        : scrap,
+    wip_inventory:
+      wipInventory.length === 0
+        ? [{ total_product_count: 0, total_stock_price: 0 }]
+        : wipInventory,
   });
 });

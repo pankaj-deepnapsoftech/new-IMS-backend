@@ -1,5 +1,14 @@
 const express = require("express");
-const { create, update, getAll, getOne, AddToken, uploadinvoice, Delivered } = require("../controllers/sales");
+const {
+  create,
+  update,
+  getAll,
+  getOne,
+  AddToken,
+  uploadinvoice,
+  Delivered,
+  Imagehandler,
+} = require("../controllers/sales");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 // const { isSuper } = require("../middlewares/isSuper");
 const { isAllowed } = require("../middlewares/isAllowed");
@@ -15,19 +24,19 @@ router.post("/create", isAuthenticated, create);
 
 // router.get("/:id", isAuthenticated, isAllowed, details);
 
-router.put(
-    "/update/:id",
-    isAuthenticated,
-    update
+router.put("/update/:id", isAuthenticated, update);
+
+router.patch(
+  "/upload-image/:id",
+  isAuthenticated, // second image  upload
+   Imagehandler
 );
 
-
-
 router.put(
-    "/upload-invoice/:id",
-    isAuthenticated,
-    Imageupload.single("invoice"),
-    uploadinvoice
+  "/upload-invoice/:id",
+  isAuthenticated,
+  Imageupload.single("invoice"),
+  uploadinvoice
 );
 
 router.patch("/addToken/:id", isAuthenticated, AddToken);
@@ -35,10 +44,6 @@ router.patch("/addToken/:id", isAuthenticated, AddToken);
 router.get("/getAll", isAuthenticated, getAll);
 router.get("/getOne", isAuthenticated, getOne);
 
-router.patch(
-    "/delivery/:id",
-    Imageupload.single("delivery"),
-    Delivered
-);
-module.exports = router; 
+router.patch("/delivery/:id", Imageupload.single("delivery"), Delivered);
+module.exports = router;
 //

@@ -1,9 +1,10 @@
+const { AssinedModel } = require("../models/Assined-to.model");
 const { Purchase } = require("../models/purchase");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 
 const generateorderId = async () => {
   const lastParty = await Purchase.findOne().sort({ createdAt: -1 });
- 
+
   if (!lastParty) return "OID001";
   const lastId = lastParty.order_id.replace("OID", "");
   const nextId = Number(lastId) + 1;
@@ -14,15 +15,15 @@ exports.create = TryCatch(async (req, res) => {
   try {
     const data = req.body;
     const order_id = await generateorderId();
-    // const productFile = req.files?.productFile?.[0]; 
-    // const productFilePath = productFile              
+    // const productFile = req.files?.productFile?.[0];
+    // const productFilePath = productFile
     //   ? `https://rtpasbackend.deepmart.shop/images/${productFile.filename}`///
-    //   : null;                                                              
-    const newData = { 
+    //   : null;
+    const newData = {
       ...data,
       user_id: req?.user._id,
       order_id,
-    //   productFile: productFilePath,
+      //   productFile: productFilePath,
     };
     await Purchase.create(newData);
     return res.status(201).json({ message: "Purchase Order Generated" });
@@ -40,6 +41,56 @@ exports.update = TryCatch(async (req, res) => {
   }
   await Purchase.findByIdAndUpdate(id, data);
   return res.status(201).json({ message: "Purchase Order updated" });
+});
+
+//  exports.Imagehandler = TryCatch(async (req, res)=> {
+//     const { assined_to, assinedto_comment } = req.body;
+//     const { id } = req.params;
+//     const { filename } = req.file;
+//     const find = await Purchase.findById(id);
+//     if (!find) {
+//       return res.status(404).json({
+//         message: "data not found try again",
+//       });
+//     }                                                    //for second image
+
+//     const path = `https://rtpasbackend.deepmart.shop/images/${filename}`;
+
+//     await Purchase.findByIdAndUpdate(id, { designFile: path });
+
+//     await AssinedModel.findByIdAndUpdate(assined_to, {
+//       isCompleted: "Completed",
+//       assinedto_comment,
+//     });
+//     return res.status(201).json({
+//       message: "file uploaded successful",
+//     });
+//  )};
+exports.Imagehandler = TryCatch(async (req, res) => {
+  const { assined_to, assinedto_comment, designFile } = req.body;
+  const { id } = req.params;
+
+  if (!designFile) {
+    return res.status(400).json({ message: "Design file URL is required" });
+  }
+
+  const find = await Purchase.findById(id);
+  if (!find) {
+    return res.status(404).json({ message: "Sale not found" });
+  }
+
+  // Save designFile URL in DB
+  await Purchase.findByIdAndUpdate(id, {
+    designFile: designFile,
+  });
+
+  // Update assignment status
+  await AssinedModel.findByIdAndUpdate(assined_to, {
+    isCompleted: "Completed",
+    assinedto_comment,
+  });
+
+  return res.status(201).json({ message: "Design file uploaded successfully" });
 });
 
 exports.getAll = TryCatch(async (req, res) => {
@@ -184,6 +235,26 @@ exports.getAll = TryCatch(async (req, res) => {
             },
           },
         ],
+      },
+    },
+    {
+      $addFields: {
+        total_price: {
+          $add: [
+            { $multiply: ["$price", "$product_qty"] },
+            {
+              $divide: [
+                {
+                  $multiply: [
+                    { $multiply: ["$price", "$product_qty"] },
+                    "$GST",
+                  ],
+                },
+                100,
+              ],
+            },
+          ],
+        },
       },
     },
   ])
@@ -341,6 +412,26 @@ exports.getOne = TryCatch(async (req, res) => {
             },
           },
         ],
+      },
+    },
+    {
+      $addFields: {
+        total_price: {
+          $add: [
+            { $multiply: ["$price", "$product_qty"] },
+            {
+              $divide: [
+                {
+                  $multiply: [
+                    { $multiply: ["$price", "$product_qty"] },
+                    "$GST",
+                  ],
+                },
+                100,
+              ],
+            },
+          ],
+        },
       },
     },
   ])

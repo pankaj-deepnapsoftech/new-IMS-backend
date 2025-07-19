@@ -10,4 +10,4 @@ router.route('/:_id')
         .put(isAuthenticated, update)
         .delete(isAuthenticated, remove)
 
-module.exports = router;
+module.exports = router; 

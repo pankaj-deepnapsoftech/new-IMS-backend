@@ -12,8 +12,7 @@ router.get('/unapproved/raw-materials', isAuthenticated, isSuper, unapprovedRawM
 router.post('/approve/raw-materials', isAuthenticated, isSuper, approveRawMaterialForAdmin);
 router.get('/unapproved/inventory/raw-materials', isAuthenticated, unapprovedRawMaterials);
 router.post('/approve/inventory/raw-materials', isAuthenticated, approveRawMaterial);
-router.route('/:id')
-        .put(isAuthenticated, isAllowed, update)
+router.route('/:id')    
         .delete(isAuthenticated, isAllowed, remove)
         .get(isAuthenticated, isAllowed, details);
 router.get('/bom/:_id', isAuthenticated, findFinishedGoodBom);
