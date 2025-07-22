@@ -677,6 +677,7 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
 // Inventory Personnel
 exports.approveRawMaterial = TryCatch(async (req, res) => {
   const { _id } = req.body;
+  // console.log("Raw material id:", _id);
   if (!_id) {
     throw new ErrorHandler("Raw material id not provided", 400);
   }
@@ -690,13 +691,15 @@ exports.approveRawMaterial = TryCatch(async (req, res) => {
     "raw_materials"
   );
   const allRawMaterials = requiredBom.raw_materials;
-  let areAllApproved = true;
-  allRawMaterials.forEach((rm) => areAllApproved && rm.approved);
-  if (areAllApproved) {
-    await ProductionProcess.findByIdAndUpdate(
-      { _id: requiredBom.production_process },
-      { status: "raw materials approved" }
-    );
+
+  let areAllApproved = allRawMaterials.every(
+    (rm) => rm.approvedByInventoryPersonnel
+  );
+
+  if (areAllApproved && requiredBom.production_process) {
+    await ProductionProcess.findByIdAndUpdate(requiredBom.production_process, {
+      status: "raw materials approved",
+    });
   }
 
   res.status(200).json({
@@ -714,21 +717,20 @@ exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
 
   const result = {};
 
-allBoms.forEach(bom => {
-  const day = new Date(bom.createdAt).toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    weekday: 'long',
+  allBoms.forEach((bom) => {
+    const day = new Date(bom.createdAt).toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      weekday: "long",
+    });
+
+    if (!result[day]) result[day] = [];
+
+    result[day].push({
+      name: bom.bom_name,
+      date: new Date(bom.createdAt).toLocaleDateString("en-IN"),
+      id: bom._id,
+    });
   });
-
-  if (!result[day]) result[day] = [];
-
-  result[day].push({
-    name: bom.bom_name,
-    date: new Date(bom.createdAt).toLocaleDateString('en-IN'),
-    id: bom._id,
-  });
-});
-
 
   res.status(200).json({
     success: true,
