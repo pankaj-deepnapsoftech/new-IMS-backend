@@ -705,3 +705,33 @@ exports.approveRawMaterial = TryCatch(async (req, res) => {
     message: "Raw material has been approved successfully",
   });
 });
+
+// GET /api/bom/weekly
+exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
+  const allBoms = await BOM.find({ approved: true }).select(
+    "bom_name createdAt"
+  );
+
+  const result = {};
+
+allBoms.forEach(bom => {
+  const day = new Date(bom.createdAt).toLocaleDateString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    weekday: 'long',
+  });
+
+  if (!result[day]) result[day] = [];
+
+  result[day].push({
+    name: bom.bom_name,
+    date: new Date(bom.createdAt).toLocaleDateString('en-IN'),
+    id: bom._id,
+  });
+});
+
+
+  res.status(200).json({
+    success: true,
+    weekMap: result,
+  });
+});
