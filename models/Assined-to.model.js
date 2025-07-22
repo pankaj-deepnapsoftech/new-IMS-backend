@@ -11,4 +11,4 @@ const AssinedSchema = new Schema({
     assinedto_comment:{type:String,trim:true},
 },{timestamps:true})
 
-exports.AssinedModel = model("assined",AssinedSchema);
+exports.AssinedModel = model("assined",AssinedSchema); 

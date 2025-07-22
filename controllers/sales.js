@@ -82,6 +82,7 @@ exports.Imagehandler = TryCatch(async (req, res) => {
   // Save designFile URL in DB
   await Purchase.findByIdAndUpdate(id, {
     designFile: designFile,
+      
   });
 
   // Update assignment status
