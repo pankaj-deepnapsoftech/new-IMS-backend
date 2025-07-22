@@ -16,5 +16,6 @@ router.route('/:id')
         .delete(isAuthenticated, isAllowed, remove)
         .get(isAuthenticated, isAllowed, details);
 router.get('/bom/:_id', isAuthenticated, findFinishedGoodBom);
-
+router.route('/:id')
+        .put(isAuthenticated, isAllowed, update)
 module.exports = router;
