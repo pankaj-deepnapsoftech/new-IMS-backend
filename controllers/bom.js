@@ -125,6 +125,26 @@ exports.create = TryCatch(async (req, res) => {
       bom,
     });
   }
+  await Promise.all(
+    raw_materials.map(async (material) => {
+      const product = await Product.findById(material.item);
+      if (product) {
+        product.current_stock =
+          (product.current_stock || 0) - material.quantity;
+        product.change_type = "decrease";
+        product.quantity_changed = material.quantity;
+        await product.save();
+      }
+    })
+  );
+  const finishedProduct = await Product.findById(finished_good.item);
+  if (finishedProduct) {
+    finishedProduct.current_stock =
+      (finishedProduct.current_stock || 0) + finished_good.quantity;
+    finishedProduct.change_type = "increase";
+    finishedProduct.quantity_changed = finished_good.quantity;
+    await finishedProduct.save();
+  }
 
   res.status(200).json({
     status: 200,

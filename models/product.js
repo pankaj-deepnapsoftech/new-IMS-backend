@@ -17,7 +17,7 @@ const productSchema = new Schema({
         type: String,
         required: [true, "Product Id is a required field"],
         unique: true,
-    },
+    },    
     uom: {
         type: String,
         required: [true, 'Unit of Measurement (UoM) is a required field'],
