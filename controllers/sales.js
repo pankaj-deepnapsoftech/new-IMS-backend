@@ -191,7 +191,6 @@ exports.getAll = TryCatch(async (req, res) => {
         from: "parties",
         localField: "party",
         foreignField: "_id",
-
         as: "party",
         pipeline: [
           {
@@ -361,16 +360,25 @@ exports.getOne = TryCatch(async (req, res) => {
         from: "parties",
         localField: "party",
         foreignField: "_id",
-        as: "party_id",
+        as: "party",
         pipeline: [
           {
             $project: {
-              full_name: 1,
+              consignee_name: 1,
+              contact_number: 1,
+              cust_id: 1,
             },
           },
         ],
       },
     },
+    {
+      $unwind: {
+        path: "$party",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
     {
       $lookup: {
         from: "products",
