@@ -91,13 +91,28 @@ exports.DeleteParties = TryCatch(async (req, res) => {
 exports.UpdateParties = TryCatch(async (req, res) => {
   const data = req.body;
   const { id } = req.params;
+
   const find = await PartiesModels.findById(id);
   if (!find) {
-    throw new ErrorHandler("Party not register", 400);
+    throw new ErrorHandler("Party not registered", 400);
   }
-  await PartiesModels.findByIdAndUpdate(id, data, { new: true });
+
+  // Destructure type/company/consignee from incoming update data
+  const { type, company_name, consignee_name } = data;
+
+  // Generate new cust_id based on updated data
+  const cust_id = await generateCustomerId(type, company_name, consignee_name);
+
+  // Update the party with new data + generated cust_id
+  const updated = await PartiesModels.findByIdAndUpdate(
+    id,
+    { ...data, cust_id },
+    { new: true }
+  );
+
   return res.status(200).json({
-    message: "data updated successful",
+    message: "Data updated successfully",
+    updated,
   });
-});   
+});
 
