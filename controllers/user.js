@@ -11,12 +11,19 @@ exports.create = TryCatch(async (req, res) => {
   const totalUsers = await User.find().countDocuments();
 
   let isSuper = false;
+  let employeeId = null;
   // If it is the first user then make it the super admin
   if (totalUsers === 0) {
     isSuper = true;
+  } else {
+    const nonSuperUserCount = await User.countDocuments({ isSuper: false });
+    const prefix =
+      userDetails.first_name?.substring(0, 3).toUpperCase() || "EMP";
+    const idNumber = String(nonSuperUserCount + 1).padStart(4, "0");
+    employeeId = `${prefix}${idNumber}`;
   }
-
-  const user = await User.create({ ...userDetails, isSuper });
+  
+  const user = await User.create({ ...userDetails, isSuper ,employeeId });
   user.password = undefined;
 
   let otp = generateOTP(4);
@@ -53,10 +60,10 @@ exports.verifyUser = TryCatch(async (req, res) => {
   });
 });
 exports.update = TryCatch(async (req, res) => {
-  const {_id, role} = req.body;
+  const { _id, role } = req.body;
 
-  if(!_id || !role){
-    throw new ErrorHandler('Please provide all the fields', 400);
+  if (!_id || !role) {
+    throw new ErrorHandler("Please provide all the fields", 400);
   }
 
   const user = await User.findByIdAndUpdate(
@@ -108,7 +115,7 @@ exports.details = TryCatch(async (req, res) => {
 exports.employeeDetails = TryCatch(async (req, res) => {
   const userId = req.params._id;
 
-  if(!userId){
+  if (!userId) {
     throw new ErrorHandler("User id not found", 400);
   }
 
@@ -126,9 +133,9 @@ exports.employeeDetails = TryCatch(async (req, res) => {
 exports.loginWithPassword = TryCatch(async (req, res) => {
   const { email, password } = req.body;
 
-  const user = await User.findOne({ email }).select(
-    "first_name last_name email phone role isSuper password"
-  ).populate('role');
+  const user = await User.findOne({ email })
+    .select("first_name last_name email phone role isSuper password")
+    .populate("role");
   if (!user) {
     throw new Error("User doesn't exist", 400);
   }
@@ -176,7 +183,9 @@ exports.loginWithToken = TryCatch(async (req, res) => {
     verified.iat < currentTimeInSeconds &&
     verified.exp > currentTimeInSeconds
   ) {
-    const user = await User.findOne({ email: verified?.email }).populate('role');
+    const user = await User.findOne({ email: verified?.email }).populate(
+      "role"
+    );
     if (!user) {
       throw new ErrorHandler("User doesn't exist", 401);
     }
@@ -201,11 +210,11 @@ exports.loginWithToken = TryCatch(async (req, res) => {
   throw new ErrorHandler("Session expired, login again", 401);
 });
 exports.resetPasswordRequest = TryCatch(async (req, res) => {
-  const {email} = req.body;
-  if(!email){
+  const { email } = req.body;
+  if (!email) {
     throw new ErrorHandler("Email Id not provided", 400);
   }
-  const user = await User.findOne({email});
+  const user = await User.findOne({ email });
   if (!user) {
     throw new ErrorHandler("User doesn't exist", 400);
   }
@@ -325,11 +334,11 @@ exports.resendOtp = TryCatch(async (req, res) => {
     message: "OTP has been successfully sent to your email id",
   });
 });
-exports.all = TryCatch(async (req, res)=>{
-  const users = await User.find({}).populate('role');
+exports.all = TryCatch(async (req, res) => {
+  const users = await User.find({}).populate("role");
   res.status(200).json({
     status: 200,
     success: true,
-    users
-  })
-})
+    users,
+  });
+});

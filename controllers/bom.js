@@ -131,10 +131,11 @@ exports.create = TryCatch(async (req, res) => {
       if (product) {
         product.current_stock =
           (product.current_stock || 0) - material.quantity;
-        product.change_type = "decrease";
+        product.change_type = "decrease";   
         product.quantity_changed = material.quantity;
         await product.save();
       }
+
     })
   );
   const finishedProduct = await Product.findById(finished_good.item);
@@ -145,7 +146,7 @@ exports.create = TryCatch(async (req, res) => {
     finishedProduct.quantity_changed = finished_good.quantity;
     await finishedProduct.save();
   }
-
+    
   res.status(200).json({
     status: 200,
     success: true,
