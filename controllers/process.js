@@ -181,11 +181,14 @@ exports.update = async (req, res) => {
   }
   productionProcess.status = status;
   productionProcess.processes.forEach((p) => {
-    const process = bom.processes.find(
-      (pr) => pr._id.toString() === p._id.toString()
+    const process = bom.processes?.find(
+      (pr) => pr?._id?.toString() === p._id?.toString()
     );
-    p.done = process.done;
+    if (process) {
+      p.done = process.done;
+    }
   });
+
   await productionProcess.save();
 
   res.status(200).json({
