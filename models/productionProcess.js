@@ -55,6 +55,10 @@ const productionProcessSchema = new Schema(
                 type: String,
                 required: [true, 'Process is a required field']
             },
+            start: {
+              type: Boolean,
+              default: false
+          },
             done: {
                 type: Boolean,
                 default: false

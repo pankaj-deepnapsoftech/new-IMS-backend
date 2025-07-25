@@ -186,6 +186,7 @@ exports.update = async (req, res) => {
     );
     if (process) {
       p.done = process.done;
+      p.start = process.start;
     }
   });
 
