@@ -50,17 +50,24 @@ const productionProcessSchema = new Schema(
       default: false,
     },
     processes: {
-        type: [{
-            process: {
-                type: String,
-                required: [true, 'Process is a required field']
-            },
-            done: {
-                type: Boolean,
-                default: false
-            }
-        }],
-        required: [true, 'Processes is a required field']
+      type: [
+        {
+          process: {
+            type: String,
+            required: [true, "Process is a required field"],
+            set: (value) => value.charAt(0).toUpperCase() + value.slice(1),
+          },
+          start: {
+            type: Boolean,
+            default: false,
+          },
+          done: {
+            type: Boolean,
+            default: false,
+          },
+        },
+      ],
+      required: [true, "Processes is a required field"],
     },
     raw_materials: {
       type: [

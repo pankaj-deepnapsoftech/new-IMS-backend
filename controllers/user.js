@@ -9,6 +9,8 @@ const { sendEmail } = require("../utils/sendEmail");
 exports.create = TryCatch(async (req, res) => {
   const userDetails = req.body;
   const totalUsers = await User.find().countDocuments();
+  const nonSuperUserCount = await User.countDocuments({ isSuper: false });
+
 
   let isSuper = false;
   let employeeId = null;
@@ -22,8 +24,12 @@ exports.create = TryCatch(async (req, res) => {
     const idNumber = String(nonSuperUserCount + 1).padStart(4, "0");
     employeeId = `${prefix}${idNumber}`;
   }
-  
-  const user = await User.create({ ...userDetails, isSuper ,employeeId });
+  // If the non-super user count exceeds 100, throw an error
+  if (nonSuperUserCount >= 100) {
+    throw new ErrorHandler("Maximum limit of 100 employees reached", 403);
+  }
+
+  const user = await User.create({ ...userDetails, isSuper, employeeId });
   user.password = undefined;
 
   let otp = generateOTP(4);

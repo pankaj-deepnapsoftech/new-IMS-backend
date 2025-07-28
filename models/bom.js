@@ -9,11 +9,11 @@ const bomSchema = new Schema(
     },
     production_process: {
       type: Schema.Types.ObjectId,
-      ref: "Production-Process"
+      ref: "Production-Process",
     },
     is_production_started: {
       type: Boolean,
-      default: false
+      default: false,
     },
     raw_materials: {
       type: [Schema.Types.ObjectId],
@@ -23,11 +23,22 @@ const bomSchema = new Schema(
       type: [Schema.Types.ObjectId],
       ref: "BOM-Scrap-Material",
     },
+   
     processes: {
       type: [String],
+      set: (value) => {
+        if (Array.isArray(value)) {
+          return value.map((str) =>
+            typeof str === "string"
+              ? str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+              : str
+          );
+        }
+        return value;
+      },
     },
     finished_good: {
-      type: Schema.Types.ObjectId,
+      type: Schema.Types.ObjectId,  
       ref: "BOM-Finished-Material",
       required: [true, "Finished good is a required field"],
     },
@@ -45,6 +56,7 @@ const bomSchema = new Schema(
     bom_name: {
       type: String,
       required: [true, "BOM name is a required field"],
+      set: (value) => value.charAt(0).toUpperCase() + value.slice(1),
     },
     parts_count: {
       type: Number,

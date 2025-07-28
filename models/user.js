@@ -8,10 +8,12 @@ const userSchema = new Schema(
       required: [true, "First Name is a required field"],
       minlength: [2, "First Name must be atleast 2 characters long"],
       maxlength: [40, "First Name cannot exceed 40 characters"],
+      set: (value) => value.charAt(0).toUpperCase() + value.slice(1),
     },
     last_name: {
       type: String,
       maxlength: [40, "Last Name cannot exceed 40 characters"],
+      set: (value) => value.charAt(0).toUpperCase() + value.slice(1),
     },
     email: {
       type: String,
