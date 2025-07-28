@@ -24,6 +24,7 @@ const bomSchema = new Schema(
       ref: "BOM-Scrap-Material",
     },
    
+    
     processes: {
       type: [String],
       set: (value) => {
