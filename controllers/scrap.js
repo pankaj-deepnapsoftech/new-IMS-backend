@@ -28,10 +28,15 @@ exports.all = TryCatch(async (req, res) => {
   });
 
   processes.forEach((material) => {
+    if (!material.bom || !material.bom.scrap_materials) return;
+
     material.scrap_materials.forEach((sc) => {
       const bomItem = material.bom.scrap_materials.find(
         (m) => m.item._id.toString() === sc.item._id.toString()
       );
+
+      // Optional: also check if bomItem is found
+      if (!bomItem) return;
 
       scraps.push({
         ...sc._doc,
@@ -43,6 +48,7 @@ exports.all = TryCatch(async (req, res) => {
       });
     });
   });
+
 
   res.status(200).json({
     status: 200,
