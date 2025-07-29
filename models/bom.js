@@ -1,5 +1,6 @@
 const { Schema, model } = require("mongoose");
 
+
 const bomSchema = new Schema(
   {
     creator: {
@@ -71,6 +72,9 @@ const bomSchema = new Schema(
     total_cost: {
       type: Number,
       required: [true, "Total cost is a required field"],
+    },
+    remarks:{
+      type:String,
     },
   },
   {

@@ -3,6 +3,7 @@ const fs = require('fs');
 const csv = require('csvtojson');
 const { TryCatch, ErrorHandler } = require("../utils/error");
 const { checkAgentCsvValidity } = require("../utils/checkAgentCsvValidity");
+const { PartiesModels } = require("../models/Parties");
 
 exports.create = TryCatch(async (req, res) => {
   const agentDetails = req.body;
@@ -79,13 +80,26 @@ exports.allBuyers = TryCatch(async (req, res) => {
   });
 });
 exports.allSuppliers = TryCatch(async (req, res) => {
-  const agents = await Agent.find({ agent_type: "supplier", approved: true });
+  const agents = await PartiesModels.find(
+    { parties_type: "Seller" },
+    { _id: 1, consignee_name: 1 }
+  );
+
+  const formatted = agents.map(agent => ({
+    id: agent._id,
+    name: Array.isArray(agent.consignee_name) ? agent.consignee_name[0] : agent.consignee_name
+  }));
+
   res.status(200).json({
     status: 200,
     success: true,
-    agents,
+    agents: formatted,
   });
 });
+
+
+
+
 exports.unapprovedBuyers = TryCatch(async (req, res) => {
   const agents = await Agent.find({ agent_type: "buyer", approved: false });
   res.status(200).json({
