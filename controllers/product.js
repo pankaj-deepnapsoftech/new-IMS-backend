@@ -94,7 +94,7 @@ exports.details = TryCatch(async (req, res) => {
 exports.all = TryCatch(async (req, res) => {
   const { category } = req.query;
   let products;
-  if (category) {
+  if (category) { 
     products = await Product.find({
       approved: true,
       inventory_category: category,
