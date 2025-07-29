@@ -11,7 +11,7 @@ const userRoleSchema = new Schema({
     permissions: {
         type: [String],
         enum: {
-            values: ['dashboard', 'user role', 'employee', 'inventory', 'store', 'approval', 'agent', 'production', 'sale & purchase','parties','sales','task'],
+            values: ['dashboard', 'user role', 'employee', 'inventory', 'store', 'approval', 'agent', 'production', 'sale & purchase','parties','sales','task','bom'],
             message: "Permissions should be one of the following: product, store, approval, agent, bom"
         }
     },
