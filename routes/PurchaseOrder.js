@@ -1,4 +1,4 @@
-const exprress = require("express");
+const express = require("express");
 const {
   create,
   all,

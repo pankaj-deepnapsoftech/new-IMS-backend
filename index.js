@@ -73,7 +73,7 @@ app.use("/api/sale", salesRoutes);
 app.use("/api/assined", AssinedRoutes);
 app.use("/api/parties",PartiesRoutes);
 app.use('/api/dispatch',DispatchRoute);
-api.use('/api/purchase-order', PurchaseOrderRoutes);
+// app.use('/api/purchase-order', PurchaseOrderRoutes);
 app.use(globalErrorHandler);
 
 app.listen(process.env.PORT, () => {
