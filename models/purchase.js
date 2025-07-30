@@ -17,6 +17,7 @@ const Purchases = new Schema(
     GST: { type: Number, trim: true },
     productFile: { type: String },///
     designFile: { type: String },///
+    bompdf: { type: String },
     uom: {
       type: String,
       required: [true, "Unit of Measurement (UoM) is a required field"],

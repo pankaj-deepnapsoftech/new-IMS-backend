@@ -18,6 +18,7 @@ exports.create = TryCatch(async (req, res) => {
     total_cost,
     scrap_materials,
     other_charges,
+    remarks,
   } = req.body;
 
   let insuffientStockMsg = "";
@@ -82,6 +83,7 @@ exports.create = TryCatch(async (req, res) => {
     approved: req.user.isSuper,
     creator: req.user._id,
     other_charges,
+    remarks,
   });
 
   if (raw_materials) {
@@ -166,6 +168,7 @@ exports.update = TryCatch(async (req, res) => {
     processes,
     scrap_materials,
     other_charges,
+    remarks,
   } = req.body;
   if (!id) {
     throw new ErrorHandler("id not provided", 400);
@@ -394,7 +397,9 @@ exports.update = TryCatch(async (req, res) => {
   if (processes && processes.length > 0) {
     bom.processes = processes;
   }
-
+  if (typeof remarks === "string") {
+    bom.remarks = remarks.trim();
+  }
   bom_name && bom_name.trim().length > 0 && (bom.bom_name = bom_name);
   parts_count && parts_count > 0 && (bom.parts_count = parts_count);
   total_cost && (bom.total_cost = total_cost);
