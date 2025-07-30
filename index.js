@@ -18,7 +18,8 @@ const scrapRoutes = require("./routes/scrap");
 const salesRoutes = require("./routes/sales");
 const AssinedRoutes = require("./routes/Assined.routes");
 const PartiesRoutes = require("./routes/Parties")
-const DispatchRoute = require("./routes/Dispatch.routes")
+const DispatchRoute = require("./routes/Dispatch.routes");
+const PurchaseOrderRoutes = require("./routes/PurchaseOrder");
 const app = express();
 
 // require('dotenv').config({ path: `.env.${process.env.NODE_ENV}` })
@@ -72,6 +73,7 @@ app.use("/api/sale", salesRoutes);
 app.use("/api/assined", AssinedRoutes);
 app.use("/api/parties",PartiesRoutes);
 app.use('/api/dispatch',DispatchRoute);
+api.use('/api/purchase-order', PurchaseOrderRoutes);
 app.use(globalErrorHandler);
 
 app.listen(process.env.PORT, () => {

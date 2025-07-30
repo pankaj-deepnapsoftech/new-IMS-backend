@@ -1,0 +1,19 @@
+const exprress = require("express");
+const {
+  create,
+  all,
+  details,
+  update,
+  remove,
+} = require("../controllers/purchaseOrder");
+const { isAuthenticated } = require("../middlewares/isAuthenticated");
+const router = express.Router();
+
+router.post("/", isAuthenticated, create);
+router.get("/all", isAuthenticated, all);
+router.route("/:_id")
+  .get(isAuthenticated, details)
+  .put(isAuthenticated, update)
+  .delete(isAuthenticated, remove);
+
+module.exports = router;
