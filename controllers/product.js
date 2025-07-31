@@ -22,7 +22,7 @@ exports.create = TryCatch(async (req, res) => {
     product_id: generatedId,
     approved: req.user.isSuper,
   });
-
+  console.log(product)
   res.status(200).json({
     status: 200,
     success: true,
