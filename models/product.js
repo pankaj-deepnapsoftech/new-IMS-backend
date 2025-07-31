@@ -27,10 +27,10 @@ const productSchema = new Schema({
     category: {
         type: String,
         required: [true, "Product Category is a required field"],
-        enum: {
-            values: ['finished goods', 'raw materials', 'semi finished goods', 'consumables', 'bought out parts', 'trading goods', 'service'],
-            message: 'Product Category must be one of the following: finished goods, raw materials, semi finished goods, consumables, bought out parts, trading goods, service'
-        }
+        // enum: {
+        //     values: ['finished goods', 'raw materials', 'semi finished goods', 'consumables', 'bought out parts', 'trading goods', 'service'],
+        //     message: 'Product Category must be one of the following: finished goods, raw materials, semi finished goods, consumables, bought out parts, trading goods, service'
+        // }
     },
     current_stock: {
         type: Number,
