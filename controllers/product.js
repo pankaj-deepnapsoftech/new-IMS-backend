@@ -33,6 +33,7 @@ exports.create = TryCatch(async (req, res) => {
 
 exports.update = TryCatch(async (req, res) => {
   const productDetails = req.body;
+
   if (!productDetails) {
     throw new ErrorHandler("Please provide product details", 400);
   }
@@ -44,15 +45,17 @@ exports.update = TryCatch(async (req, res) => {
     throw new ErrorHandler("Product doesn't exist", 400);
   }
 
-  // Generate a new product_id based on updated category (or existing one if not passed)
-  const categoryForId = productDetails.category || product.category;
-  const newProductId = await generateProductId(categoryForId);
+  // Check if category is being changed
+  let newProductId = product.product_id; // Default: retain existing product_id
+  if (productDetails.category && productDetails.category !== product.category) {
+    newProductId = await generateProductId(productDetails.category);
+  }
 
   product = await Product.findOneAndUpdate(
     { _id },
     {
       ...productDetails,
-      product_id: newProductId, // regenerate product ID
+      product_id: newProductId,
       approved: req.user.isSuper ? productDetails?.approved : false,
     },
     { new: true }
@@ -65,7 +68,7 @@ exports.update = TryCatch(async (req, res) => {
     product,
   });
 });
-
+ 
 exports.remove = TryCatch(async (req, res) => {
   const { _id } = req.body;
   const product = await Product.findByIdAndDelete(_id);
