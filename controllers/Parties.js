@@ -1,33 +1,29 @@
 const { PartiesModels } = require("../models/Parties");
 const { TryCatch, ErrorHandler } = require("../utils/error");
+const csv = require("csvtojson");
+const fs = require("fs");
+const path = require("path");
+const { parseExcelFile } = require("../utils/parseExcelFile");
+const { checkPartiesCsvValidity } = require("../utils/checkPartiesCsvValidity");
 
 const generateCustomerId = async (partyType, companyName, consigneeName) => {
   let prefix = "";
 
-  // Use company name only if type is 'Company' and it's a valid string
   if (partyType === "Company" && typeof companyName === "string" && companyName.trim()) {
     prefix = companyName.trim().substring(0, 2).toUpperCase();
-  }
-  // Otherwise use consignee name if it's a valid string
-  else if (Array.isArray(consigneeName) && typeof consigneeName[0] === "string") {
+  } else if (Array.isArray(consigneeName) && consigneeName.length && typeof consigneeName[0] === "string") {
     prefix = consigneeName[0].trim().substring(0, 2).toUpperCase();
-  }
-  else if (typeof consigneeName === "string" && consigneeName.trim()) {
+  } else if (typeof consigneeName === "string" && consigneeName.trim()) {
     prefix = consigneeName.trim().substring(0, 2).toUpperCase();
-  }
-
-  // Fallback
-  else {
+  } else {
     prefix = "CU";
   }
 
-  // Find last party with same prefix
   const lastParty = await PartiesModels.findOne({
     cust_id: { $regex: `^${prefix}` }
   }).sort({ createdAt: -1 });
 
   let nextId = 1;
-
   if (lastParty) {
     const lastId = lastParty.cust_id.replace(prefix, "");
     nextId = Number(lastId) + 1;
@@ -36,26 +32,19 @@ const generateCustomerId = async (partyType, companyName, consigneeName) => {
   return `${prefix}${nextId.toString().padStart(3, "0")}`;
 };
 
-
-
-
 exports.CreateParties = TryCatch(async (req, res) => {
   const data = req.body;
   const { type, company_name, consignee_name } = data;
 
-
   const cust_id = await generateCustomerId(type, company_name, consignee_name);
 
-
   const result = await PartiesModels.create({ ...data, cust_id });
-     console.log(result)
+  console.log(result);
   return res.status(201).json({
     message: "Party added successfully",
     result,
   });
 });
-
-
 
 exports.GetParties = TryCatch(async (req, res) => {
   const { page, limit } = req.query;
@@ -73,7 +62,6 @@ exports.GetParties = TryCatch(async (req, res) => {
     totalData,
   });
 });
-
 
 exports.DeleteParties = TryCatch(async (req, res) => {
   const { id } = req.params;
@@ -116,3 +104,45 @@ exports.UpdateParties = TryCatch(async (req, res) => {
   });
 });
 
+// Bulk Upload Handler
+exports.bulkUploadHandler = async (req, res) => {
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  let parsedData = [];
+
+  try {
+    if (ext === ".csv") {
+      parsedData = await csv().fromFile(req.file.path);
+    } else if (ext === ".xlsx") {
+      parsedData = parseExcelFile(req.file.path);
+    } else {
+      throw new ErrorHandler("Unsupported file type. Please upload .csv or .xlsx", 400);
+    }
+
+    fs.unlink(req.file.path, () => {}); // Clean up uploaded file
+
+    await checkPartiesCsvValidity(parsedData); // Validate rows
+
+    const processedParties = [];
+    for (const party of parsedData) {
+      const cust_id = await generateCustomerId(
+        party.type,
+        party.company_name,
+        party.consignee_name
+      );
+
+      processedParties.push({ ...party, cust_id });
+    }
+
+    await PartiesModels.insertMany(processedParties);
+
+    return res.status(200).json({
+      success: true,
+      message: "Parties uploaded successfully",
+    });
+  } catch (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.message || "Upload failed",
+    });
+  }
+};
