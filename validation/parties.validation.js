@@ -16,7 +16,7 @@ exports.PartiesValidation = object({
   bill_to: string().required("Bill To address is required"),
 
   shipped_gst_to: string().when("type", {
-    is: (val) => val === "Company", // ✅ FUNCTION form of `is`
+    is: (val) => val === "Company",
     then: (schema) =>
       schema
         .required("Shipped To GST is required")
@@ -28,7 +28,7 @@ exports.PartiesValidation = object({
   }),
 
   bill_gst_to: string().when("type", {
-    is: (val) => val === "Company", // ✅ FUNCTION form of `is`
+    is: (val) => val === "Company",
     then: (schema) =>
       schema
         .required("Bill To GST is required")
