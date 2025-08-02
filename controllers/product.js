@@ -441,7 +441,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
       mrp: 1200,
       dealer_price: 1100,
       distributor_price: 1050,
-      store: "faridabad",
+      store: "Faridabad",
     },
     {
       inventory_category: "direct",
@@ -457,7 +457,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
       mrp: 600,
       dealer_price: 550,
       distributor_price: 525,
-      store: "faridabad",
+      store: "Faridabad",
     },
     {
       inventory_category: "direct",
@@ -477,7 +477,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
       mrp: 900,
       dealer_price: 850,
       distributor_price: 800,
-      store: "faridabad",
+      store: "Faridabad",
     },
   ];
 
