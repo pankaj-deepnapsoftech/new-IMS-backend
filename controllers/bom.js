@@ -549,6 +549,34 @@ exports.all = TryCatch(async (req, res) => {
       ],
     })
     .sort({ updatedAt: -1 });
+    // console.log("boms-/->>",boms);
+  res.status(200).json({
+    status: 200,
+    success: true,
+    boms,
+  });
+});
+exports.approved = TryCatch(async (req, res) => {
+  const boms = await BOM.find({ approved: true })
+    .populate("approved_by")
+    .populate({
+      path: "finished_good",
+      populate: [
+        {
+          path: "item",
+        },
+      ],
+    })
+    .populate({
+      path: "raw_materials",
+      populate: [
+        {
+          path: "item",
+        },
+      ],
+    })
+    .sort({ updatedAt: -1 });
+
   res.status(200).json({
     status: 200,
     success: true,
@@ -575,6 +603,7 @@ exports.unapproved = TryCatch(async (req, res) => {
       ],
     })
     .sort({ updatedAt: -1 });
+    
   res.status(200).json({
     status: 200,
     success: true,
