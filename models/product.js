@@ -54,6 +54,9 @@ const productSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    color_name:{
+      type:String,
+    },
     item_type: {
       type: String,
       enum: ["buy", "sell", "both"],
