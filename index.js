@@ -20,6 +20,8 @@ const AssinedRoutes = require("./routes/Assined.routes");
 const PartiesRoutes = require("./routes/Parties")
 const DispatchRoute = require("./routes/Dispatch.routes");
 const PurchaseOrderRoutes = require("./routes/PurchaseOrder");
+const ResourceRoutes = require("./routes/resources");
+
 const app = express();
 
 // require('dotenv').config({ path: `.env.${process.env.NODE_ENV}` })
@@ -74,6 +76,7 @@ app.use("/api/assined", AssinedRoutes);
 app.use("/api/parties",PartiesRoutes);
 app.use('/api/dispatch',DispatchRoute);
 app.use('/api/purchase-order', PurchaseOrderRoutes);
+app.use("/api/resources", ResourceRoutes);
 app.use(globalErrorHandler);
 
 app.listen(process.env.PORT, () => {
