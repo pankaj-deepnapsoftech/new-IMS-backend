@@ -79,7 +79,7 @@ exports.details = TryCatch(async (req, res) => {
 });
 
 exports.all = TryCatch(async (req, res) => {
-  const resources = await Resource.find();  
+  const resources = await Resource.find().sort({ createdAt: -1 });
   res.status(200).json({
     status: 200,
     success: true,
