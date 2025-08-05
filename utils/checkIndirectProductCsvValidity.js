@@ -1,7 +1,7 @@
-exports.checkProductCsvValidity = async (data) => {
+exports.checkIndirectProductCsvValidity = async (data) => {
   const itemTypes = ["buy", "sell", "both"];
   const productOrServiceTypes = ["product", "service"];
-  const inventoryCategories = ["direct"];
+  const inventoryCategories = ["indirect"];
   const categoryTypes = [
     "finished goods",
     "raw materials",
@@ -30,7 +30,7 @@ exports.checkProductCsvValidity = async (data) => {
       !inventoryCategories.includes(product.inventory_category.toLowerCase())
     ) {
       throw new Error(
-        `Inventory category must be 'direct' for this upload in row: ${rowNumber}`
+        `Inventory category must be 'indirect' for this upload in row: ${rowNumber}`
       );
     }
 
