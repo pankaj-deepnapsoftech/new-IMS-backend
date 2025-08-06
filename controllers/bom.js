@@ -565,10 +565,7 @@ exports.all = TryCatch(async (req, res) => {
         select: "name", // only item name
       },
     })
-    .sort({ updatedAt: -1 })
-    .skip(skip)
-    .limit(limit);
-
+    .sort({ updatedAt: -1 });
   res.status(200).json({
     status: 200,
     success: true,
