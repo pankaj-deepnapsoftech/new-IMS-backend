@@ -198,6 +198,7 @@ exports.getAll = TryCatch(async (req, res) => {
               consignee_name: 2,
               contact_number: 2,
               cust_id: 1,
+              company_name:1,
             },
           },
         ],

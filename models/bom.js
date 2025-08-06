@@ -1,4 +1,4 @@
-const { Schema, model } = require("mongoose");
+const { Schema, model, default: mongoose } = require("mongoose");
 
 
 const bomSchema = new Schema(
@@ -24,7 +24,19 @@ const bomSchema = new Schema(
       type: [Schema.Types.ObjectId],
       ref: "BOM-Scrap-Material",
     },
-   
+    resources: [
+      {
+        resource_id: {
+          type: Schema.Types.ObjectId,
+          ref: 'Resource',
+          required: true,
+        },
+        type: { type: String },
+        specification: { type: String },
+      }
+    ]
+,
+
     
     processes: {
       type: [String],
