@@ -3,6 +3,8 @@ const { create, unapproved,approved, update,autoBom, remove, details, all, findF
 const { isAuthenticated } = require('../middlewares/isAuthenticated');
 const { isAllowed } = require('../middlewares/isAllowed');
 const { isSuper } = require('../middlewares/isSuper');
+// const { upload } = require('../utils/upload');
+// const multer = require("multer");
 const router = express.Router();
 
 router.post('/', isAuthenticated, isAllowed, create);
@@ -21,4 +23,5 @@ router.route('/:id')
 router.get('/bom/:_id', isAuthenticated, findFinishedGoodBom);
 router.route('/:id')
         .put(isAuthenticated, isAllowed, update)
+        // router.post("/bulk", isAuthenticated, upload.single('excel'), bulkUploadBOMHandler);
 module.exports = router;

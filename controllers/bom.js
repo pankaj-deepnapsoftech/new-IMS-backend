@@ -6,6 +6,10 @@ const BOMScrapMaterial = require("../models/bom-scrap-material");
 const ProductionProcess = require("../models/productionProcess");
 const Product = require("../models/product");
 const { TryCatch, ErrorHandler } = require("../utils/error");
+const path = require("path");
+const fs = require("fs");
+const csv = require("csvtojson");
+const { parseExcelFile } = require("../utils/parseExcelFile");
 
 exports.create = TryCatch(async (req, res) => {
   const {
@@ -530,59 +534,52 @@ exports.details = TryCatch(async (req, res) => {
   });
 });
 exports.all = TryCatch(async (req, res) => {
+  // Optional: Enable pagination via query params
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 100;
+  const skip = (page - 1) * limit;
+
   const boms = await BOM.find({ approved: true })
-    .populate("approved_by")
+    .populate("approved_by", "first_name last_name") // only names
     .populate({
       path: "finished_good",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name", // only item name
+      },
     })
     .populate({
       path: "raw_materials",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
-    })
-    .sort({ updatedAt: -1 });
-  // console.log("boms-/->>",boms);
-  res.status(200).json({
-    status: 200,
-    success: true,
-    boms,
-  });
-});
-exports.approved = TryCatch(async (req, res) => {
-  const boms = await BOM.find({ approved: true })
-    .populate("approved_by")
-    .populate({
-      path: "finished_good",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name", // only item name
+      },
     })
     .populate({
-      path: "raw_materials",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
+      path: "scrap_materials",
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name", // only item name
+      },
     })
-    .sort({ updatedAt: -1 });
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
   res.status(200).json({
     status: 200,
     success: true,
+    message: "Approved BOMs fetched successfully",
+    count: boms.length,
+    page,
+    limit,
     boms,
   });
 });
+
 exports.unapproved = TryCatch(async (req, res) => {
   const boms = await BOM.find({ approved: false })
     .populate("approved_by")
@@ -1141,3 +1138,111 @@ exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
     weekMap: result,
   });
 });
+
+
+
+
+// exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
+//   const ext = path.extname(req.file.originalname).toLowerCase();
+//   let parsedData = [];
+
+//   if (!req.file) {
+//     throw new ErrorHandler("No file uploaded", 400);
+//   }
+
+//   try {
+//     if (ext === ".csv") {
+//       parsedData = await csv().fromFile(req.file.path);
+//     } else if (ext === ".xlsx") {
+//       parsedData = parseExcelFile(req.file.path);
+//     } else {
+//       throw new ErrorHandler("Unsupported file type. Please upload .csv or .xlsx", 400);
+//     }
+
+//     fs.unlink(req.file.path, () => { }); // Remove uploaded file
+
+//     if (!Array.isArray(parsedData) || parsedData.length === 0) {
+//       throw new ErrorHandler("No valid data found in uploaded file", 400);
+//     }
+
+//     const createdBOMs = [];
+
+//     for (const bomData of parsedData) {
+//       const {
+//         bom_name,
+//         parts_count,
+//         total_cost,
+//         raw_materials,
+//         finished_good,
+//         processes,
+//         other_charges,
+//         remarks,
+//       } = bomData;
+
+//       let parsedRawMaterials = [];
+//       let parsedFinishedGood = {};
+
+//       try {
+//         parsedRawMaterials = JSON.parse(raw_materials);
+//         if (!Array.isArray(parsedRawMaterials)) throw new Error();
+//       } catch (err) {
+//         throw new ErrorHandler(`Invalid JSON format for raw_materials in BOM: ${bom_name}`, 400);
+//       }
+
+//       try {
+//         parsedFinishedGood = JSON.parse(finished_good);
+//       } catch (err) {
+//         throw new ErrorHandler(`Invalid JSON format for finished_good in BOM: ${bom_name}`, 400);
+//       }
+
+//       const createdFinishedGood = await BOMFinishedMaterial.create({
+//         item: parsedFinishedGood.item,
+//         description: parsedFinishedGood.description,
+//         quantity: parsedFinishedGood.quantity,
+//         image: parsedFinishedGood.image,
+//         supporting_doc: parsedFinishedGood.supporting_doc,
+//         comments: parsedFinishedGood.comments,
+//         cost: parsedFinishedGood.cost,
+//       });
+
+//       const bom = await BOM.create({
+//         bom_name,
+//         parts_count,
+//         total_cost,
+//         processes,
+//         other_charges,
+//         remarks,
+//         approved_by: req.user._id,
+//         approval_date: new Date(),
+//         approved: req.user.isSuper,
+//         creator: req.user._id,
+//         finished_good: createdFinishedGood._id,
+//       });
+
+//       const bom_raw_materials = await Promise.all(
+//         parsedRawMaterials.map(async (material) => {
+//           const createdMaterial = await BOMRawMaterial.create({
+//             ...material,
+//             bom: bom._id,
+//           });
+//           return createdMaterial._id;
+//         })
+//       );
+
+//       bom.raw_materials = bom_raw_materials;
+//       await bom.save();
+//       createdBOMs.push(bom);
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Bulk BOM upload successful",
+//       boms: createdBOMs,
+//     });
+//   } catch (error) {
+//     res.status(400).json({
+//       success: false,
+//       message: error.message || "Bulk BOM upload failed",
+//     });
+//   }
+// });
