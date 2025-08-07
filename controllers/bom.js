@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const BOM = require("../models/bom");
 const BOMFinishedMaterial = require("../models/bom-finished-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
@@ -23,6 +24,7 @@ exports.create = TryCatch(async (req, res) => {
     scrap_materials,
     other_charges,
     remarks,
+    resources
   } = req.body;
 
   let insuffientStockMsg = "";
@@ -88,6 +90,7 @@ exports.create = TryCatch(async (req, res) => {
     creator: req.user._id,
     other_charges,
     remarks,
+    resources,
   });
 
   if (raw_materials) {
@@ -137,11 +140,10 @@ exports.create = TryCatch(async (req, res) => {
       if (product) {
         product.current_stock =
           (product.current_stock || 0) - material.quantity;
-        product.change_type = "decrease";   
+        product.change_type = "decrease";
         product.quantity_changed = material.quantity;
         await product.save();
       }
-
     })
   );
   const finishedProduct = await Product.findById(finished_good.item);
@@ -152,7 +154,7 @@ exports.create = TryCatch(async (req, res) => {
     finishedProduct.quantity_changed = finished_good.quantity;
     await finishedProduct.save();
   }
-    
+
   res.status(200).json({
     status: 200,
     success: true,
@@ -173,6 +175,7 @@ exports.update = TryCatch(async (req, res) => {
     scrap_materials,
     other_charges,
     remarks,
+    resources,
   } = req.body;
   if (!id) {
     throw new ErrorHandler("id not provided", 400);
@@ -534,19 +537,18 @@ exports.details = TryCatch(async (req, res) => {
   });
 });
 exports.all = TryCatch(async (req, res) => {
-  // Optional: Enable pagination via query params
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 100;
   const skip = (page - 1) * limit;
 
   const boms = await BOM.find({ approved: true })
-    .populate("approved_by", "first_name last_name") // only names
+    .populate("approved_by", "first_name last_name")
     .populate({
       path: "finished_good",
       select: "item quantity",
       populate: {
         path: "item",
-        select: "name", // only item name
+        select: "name",
       },
     })
     .populate({
@@ -554,7 +556,7 @@ exports.all = TryCatch(async (req, res) => {
       select: "item quantity",
       populate: {
         path: "item",
-        select: "name", // only item name
+        select: "name",
       },
     })
     .populate({
@@ -562,23 +564,39 @@ exports.all = TryCatch(async (req, res) => {
       select: "item quantity",
       populate: {
         path: "item",
-        select: "name", // only item name
+        select: "name",
       },
+    })
+    .populate({
+      path: "resources.resource_id",
+      select: "name type specification",
     })
     .sort({ updatedAt: -1 })
     .skip(skip)
     .limit(limit);
 
+  // ✅ Transform resources inside each BOM
+  const transformedBoms = boms.map((bom) => {
+    const bomObj = bom.toObject();
+    bomObj.resources = bomObj.resources.map((res) => ({
+      name: res.resource_id?.name || '',
+      type: res.resource_id?.type || res.type,
+      specification: res.resource_id?.specification || res.specification,
+    }));
+    return bomObj;
+  });
+
   res.status(200).json({
     status: 200,
     success: true,
     message: "Approved BOMs fetched successfully",
-    count: boms.length,
+    count: transformedBoms.length,
     page,
     limit,
-    boms,
+    boms: transformedBoms,
   });
 });
+
 
 exports.unapproved = TryCatch(async (req, res) => {
   const boms = await BOM.find({ approved: false })
@@ -600,10 +618,360 @@ exports.unapproved = TryCatch(async (req, res) => {
       ],
     })
     .sort({ updatedAt: -1 });
+
   res.status(200).json({
     status: 200,
     success: true,
     boms,
+  });
+});
+
+exports.autoBom = TryCatch(async (req, res) => {
+  const ObjectId = mongoose.Types.ObjectId;
+
+  const { product_id,quantity } = req.query;
+  
+  if (!product_id) {
+    throw new ErrorHandler("product id is required", 400);
+  }
+
+// Mongo Query to find full BOM detail against product_name
+// const boms = await BOM.aggregate([
+
+//   // Finished Good lookup (unchanged)
+//   {
+//     $lookup: {
+//       from: "bom-finished-materials",
+//       localField: "finished_good",
+//       foreignField: "_id",
+//       as: "finished_good"
+//     }
+//   },
+//   { $unwind: "$finished_good" },
+//   {
+//     $lookup: {
+//       from: "products",
+//       localField: "finished_good.item",
+//       foreignField: "_id",
+//       as: "finished_good.item"
+//     }
+//   },
+//   { $unwind: "$finished_good.item" },
+
+//   // Raw Materials lookup (unchanged)
+//   { $unwind: { path: "$raw_materials", preserveNullAndEmptyArrays: true } },
+//   {
+//     $lookup: {
+//       from: "bom-raw-materials",
+//       localField: "raw_materials",
+//       foreignField: "_id",
+//       as: "raw_materials.item"
+//     }
+//   },
+//   { $unwind: { path: "$raw_materials.item", preserveNullAndEmptyArrays: true } },
+
+//   // NEW: Populate raw_materials.item.item (product document)
+//   {
+//     $lookup: {
+//       from: "products",
+//       localField: "raw_materials.item.item",
+//       foreignField: "_id",
+//       as: "raw_materials.item.item"
+//     }
+//   },
+//   { $unwind: { path: "$raw_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+//   {
+//     $group: {
+//       _id: "$_id",
+//       doc: { $first: "$$ROOT" },
+//       raw_materials: { $push: "$raw_materials" }
+//     }
+//   },
+//   {
+//     $addFields: {
+//       "doc.raw_materials": {
+//         $cond: [
+//           { $eq: [{ $arrayElemAt: ["$raw_materials", 0] }, null] },
+//           [],
+//           "$raw_materials"
+//         ]
+//       }
+//     }
+//   },
+//   { $replaceRoot: { newRoot: "$doc" } },
+
+//   // Scrap Materials lookup (unchanged)
+//   { $unwind: { path: "$scrap_materials", preserveNullAndEmptyArrays: true } },
+//   {
+//     $lookup: {
+//       from: "bom-scrap-materials",
+//       localField: "scrap_materials",
+//       foreignField: "_id",
+//       as: "scrap_materials.item"
+//     }
+//   },
+//   { $unwind: { path: "$scrap_materials.item", preserveNullAndEmptyArrays: true } },
+
+//   // NEW: Populate scrap_materials.item.item (product document)
+//   {
+//     $lookup: {
+//       from: "products",
+//       localField: "scrap_materials.item.item",
+//       foreignField: "_id",
+//       as: "scrap_materials.item.item"
+//     }
+//   },
+//   { $unwind: { path: "$scrap_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+//   {
+//     $group: {
+//       _id: "$_id",
+//       doc: { $first: "$$ROOT" },
+//       scrap_materials: { $push: "$scrap_materials" }
+//     }
+//   },
+//   {
+//     $addFields: {
+//       "doc.scrap_materials": {
+//         $cond: [
+//           { $eq: [{ $arrayElemAt: ["$scrap_materials", 0] }, null] },
+//           [],
+//           "$scrap_materials"
+//         ]
+//       }
+//     }
+//   },
+//   { $replaceRoot: { newRoot: "$doc" } }
+
+// ]);
+
+
+// Mongo Query to find full BOM detail against product_name
+// const boms = await BOM.aggregate([
+
+//   // Finished Good lookup (unchanged)
+//   {
+//     $lookup: {
+//       from: "bom-finished-materials",
+//       localField: "finished_good",
+//       foreignField: "_id",
+//       as: "finished_good"
+//     }
+//   },
+//   { $unwind: "$finished_good" },
+//   {
+//     $lookup: {
+//       from: "products",
+//       localField: "finished_good.item",
+//       foreignField: "_id",
+//       as: "finished_good.item"
+//     }
+//   },
+//   { $unwind: "$finished_good.item" },
+//   {
+//     $match: {
+//       "finished_good.item.name": product_name
+//     }
+//   },
+
+//   // // Raw Materials lookup (unchanged)
+//   { $unwind: { path: "$raw_materials", preserveNullAndEmptyArrays: true } },
+//   {
+//     $lookup: {
+//       from: "bom-raw-materials",
+//       localField: "raw_materials",
+//       foreignField: "_id",
+//       as: "raw_materials.item"
+//     }
+//   },
+//   { $unwind: { path: "$raw_materials.item", preserveNullAndEmptyArrays: true } },
+
+//   // // NEW: Populate raw_materials.item.item (product document)
+//   {
+//     $lookup: {
+//       from: "products",
+//       localField: "raw_materials.item.item",
+//       foreignField: "_id",
+//       as: "raw_materials.item.item"
+//     }
+//   },
+//   { $unwind: { path: "$raw_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+//   {
+//     $group: {
+//       _id: "$_id",
+//       doc: { $first: "$$ROOT" },
+//       raw_materials: { $push: "$raw_materials" }
+//     }
+//   },
+//   {
+//     $addFields: {
+//       "doc.raw_materials": {
+//         $cond: [
+//           { $eq: [{ $arrayElemAt: ["$raw_materials", 0] }, null] },
+//           [],
+//           "$raw_materials"
+//         ]
+//       }
+//     }
+//   },
+//   { $replaceRoot: { newRoot: "$doc" } },
+
+//   // Scrap Materials lookup (unchanged)
+//   { $unwind: { path: "$scrap_materials", preserveNullAndEmptyArrays: true } },
+//   {
+//     $lookup: {
+//       from: "bom-scrap-materials",
+//       localField: "scrap_materials",
+//       foreignField: "_id",
+//       as: "scrap_materials.item"
+//     }
+//   },
+//   { $unwind: { path: "$scrap_materials.item", preserveNullAndEmptyArrays: true } },
+
+//   // NEW: Populate scrap_materials.item.item (product document)
+//   {
+//     $lookup: {
+//       from: "products",
+//       localField: "scrap_materials.item.item",
+//       foreignField: "_id",
+//       as: "scrap_materials.item.item"
+//     }
+//   },
+//   { $unwind: { path: "$scrap_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+//   {
+//     $group: {
+//       _id: "$_id",
+//       doc: { $first: "$$ROOT" },
+//       scrap_materials: { $push: "$scrap_materials" }
+//     }
+//   },
+//   {
+//     $addFields: {
+//       "doc.scrap_materials": {
+//         $cond: [
+//           { $eq: [{ $arrayElemAt: ["$scrap_materials", 0] }, null] },
+//           [],
+//           "$scrap_materials"
+//         ]
+//       }
+//     }
+//   },
+//   { $replaceRoot: { newRoot: "$doc" } }
+
+// ]);
+
+
+// Mongo query to find BOM _id against product name
+// const result = await BOM.aggregate([
+//   // Step 1: Lookup finished_good doc
+//   {
+//     $lookup: {
+//       from: "bom-finished-materials",
+//       localField: "finished_good",
+//       foreignField: "_id",
+//       as: "finished_good"
+//     }
+//   },
+//   { $unwind: "$finished_good" },
+//   // Step 2: Lookup product from finished_good.item
+//   {
+//     $lookup: {
+//       from: "products",
+//       localField: "finished_good.item",
+//       foreignField: "_id",
+//       as: "finished_good.item"
+//     }
+//   },
+//   { $unwind: "$finished_good.item" },
+//   // Step 3: Match product name
+//   {
+//     $match: {
+//       "finished_good.item.name": product_name
+//     }
+//   },
+//   // Step 4: Project only BOM _id
+//   { $unwind: "$finished_good.item.name" },
+//   {
+//     $project: {
+//       _id: 1
+//     }
+//   },
+  
+// ]);
+
+
+const result = await BOM.aggregate([
+  {
+    $lookup: {
+      from: "bom-finished-materials",
+      localField: "finished_good",
+      foreignField: "_id",
+      as: "finished_good"
+    }
+  },
+  { $unwind: "$finished_good" },
+  {
+    $lookup: {
+      from: "products",
+      localField: "finished_good.item",
+      foreignField: "_id",
+      as: "finished_good.item"
+    }
+  },
+  { $unwind: "$finished_good.item" },
+  {
+    $match: {
+      "finished_good.item._id":  new ObjectId(product_id)
+    }
+  },
+  {
+    $project: {
+      _id: 1
+    }
+  }
+]);
+
+
+if(result.length === 0){
+ return res.status(400).json({
+    status:400,
+    success:false,
+    boms:"BOM does not exists"
+
+  })
+}
+// const bomDoc = await BOM.findById(result[0]).populate('finished_good');
+// const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
+
+// bomDoc.finished_good.quantity = Number(quantity);
+// bomDoc.finished_good = bomDoc.finished_good._id;
+// const finalBom = await BOM.create(bomDoc);
+// await finalBom.save();
+ // Fetch original BOM document with populate
+
+  const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
+
+  // Modify quantity in populated finished_good
+  bomDoc.finished_good.quantity = Number(quantity);
+
+  // Convert populated finished_good back to ObjectId for saving in BOM doc
+  bomDoc.finished_good = bomDoc.finished_good._id;
+
+  // Create a plain object copy without _id (so that new document can be created)
+  const newBomData = bomDoc.toObject();
+  delete newBomData._id; 
+
+  // Create new BOM document with updated data
+  const finalBom = await BOM.create(newBomData);
+
+console.log("here");
+  res.status(200).json({
+    status: 200,
+    success: true,
+    boms: finalBom
   });
 });
 

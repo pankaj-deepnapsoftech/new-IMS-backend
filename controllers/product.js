@@ -15,6 +15,7 @@ const { checkIndirectProductCsvValidity } = require("../utils/checkIndirectProdu
 
 exports.create = TryCatch(async (req, res) => {
   const productDetails = req.body;
+  console.log("Product details",productDetails);
   if (!productDetails) {
     throw new ErrorHandler("Please provide product details", 400);
   }

@@ -505,7 +505,7 @@ exports.Delivered = TryCatch(async (req, res) => {
         message: "data not found",
       });
     }
-
+ 
     const path = `https://rtpasbackend.deepmart.shop/images/${filename}`;
     console.log("req.body.role=", req.body.role);
     if ((req.body.role = "Dispatcher")) {
