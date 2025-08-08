@@ -1,6 +1,5 @@
+//bom model
 const { Schema, model } = require("mongoose");
-
-
 const bomSchema = new Schema(
   {
     creator: {

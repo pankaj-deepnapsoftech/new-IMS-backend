@@ -1,9 +1,11 @@
+//bom controller
 const BOM = require("../models/bom");
 const BOMFinishedMaterial = require("../models/bom-finished-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
 const BOMScrapMaterial = require("../models/bom-scrap-material");
 const ProductionProcess = require("../models/productionProcess");
 const Product = require("../models/product");
+const Item = require("../models/product");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 const path = require("path");
 const fs = require("fs");
@@ -131,28 +133,28 @@ exports.create = TryCatch(async (req, res) => {
       bom,
     });
   }
-  await Promise.all(
-    raw_materials.map(async (material) => {
-      const product = await Product.findById(material.item);
-      if (product) {
-        product.current_stock =
-          (product.current_stock || 0) - material.quantity;
-        product.change_type = "decrease";   
-        product.quantity_changed = material.quantity;
-        await product.save();
-      }
+  // await Promise.all(
+  //   raw_materials.map(async (material) => {
+  //     const product = await Product.findById(material.item);
+  //     if (product) {
+  //       product.current_stock =
+  //         (product.current_stock || 0) - material.quantity;
+  //       product.change_type = "decrease";
+  //       product.quantity_changed = material.quantity;
+  //       await product.save();
+  //     }
 
-    })
-  );
-  const finishedProduct = await Product.findById(finished_good.item);
-  if (finishedProduct) {
-    finishedProduct.current_stock =
-      (finishedProduct.current_stock || 0) + finished_good.quantity;
-    finishedProduct.change_type = "increase";
-    finishedProduct.quantity_changed = finished_good.quantity;
-    await finishedProduct.save();
-  }
-    
+  //   })
+  // );
+  // const finishedProduct = await Product.findById(finished_good.item);
+  // if (finishedProduct) {
+  //   finishedProduct.current_stock =
+  //     (finishedProduct.current_stock || 0) + finished_good.quantity;
+  //   finishedProduct.change_type = "increase";
+  //   finishedProduct.quantity_changed = finished_good.quantity;
+  //   await finishedProduct.save();
+  // }
+
   res.status(200).json({
     status: 200,
     success: true,
@@ -698,6 +700,7 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
     })
     .populate({
       path: "bom",
+      // match: { production_process: { $exists: true } }, //new condition to filter BOMs with production_process
       populate: {
         path: "raw_materials",
         populate: {
@@ -706,17 +709,20 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
       },
     });
 
-  const unapprovedRawMaterials = unapprovedProducts.flatMap((prod) => {
-    const rm = prod.bom.raw_materials.filter(
-      (i) => i.item._id.toString() === prod.item.toString()
-    )[0];
+ const unapprovedRawMaterials = unapprovedProducts.flatMap((prod) => {
+  const rm = prod.bom.raw_materials.find(
+    (i) => i.item._id.toString() === prod.item.toString()
+  );
 
-    return {
-      bom_name: prod.bom._doc.bom_name,
-      ...rm.item._doc,
-      _id: prod._id,
-    };
-  });
+  return {
+    bom_id: prod.bom._id, // required to update status
+    bom_name: prod.bom.bom_name,
+    bom_status: prod.bom.production_process_status || "raw material approval pending", // optional fallback
+    ...rm.item._doc,
+    _id: prod._id, // raw material ID
+  };
+});
+
 
   res.status(200).json({
     status: 200,
@@ -749,7 +755,7 @@ exports.approveRawMaterial = TryCatch(async (req, res) => {
 
   if (areAllApproved && requiredBom.production_process) {
     await ProductionProcess.findByIdAndUpdate(requiredBom.production_process, {
-      status: "raw materials approved",
+      status: "Inventory Allocated",
     });
   }
 
@@ -789,8 +795,60 @@ exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
   });
 });
 
+exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
+  const allRawMaterials = await BOMRawMaterial.find()
+    .populate("item") // ✅ To get product details like name, product_id, price
+    .populate({
+      path: "bom",
+      select: "bom_name production_process",
+      populate: {
+        path: "raw_materials.item", // fully populate nested items
+      },
+    });
 
+  const results = [];
 
+  for (const rm of allRawMaterials) {
+    const bom = rm.bom;
+
+    if (!bom || !bom.production_process) continue;
+
+    const productionProcess = await ProductionProcess.findById(bom.production_process);
+    if (!productionProcess) continue;
+
+    const item = rm.item;
+
+    results.push({
+      _id: rm._id,
+      bom_id: bom._id,
+      bom_name: bom.bom_name,
+      bom_status: productionProcess.status,
+      production_process_id: productionProcess._id,
+      product_id: item?.product_id,
+      name: item?.name,
+      inventory_category: item?.inventory_category,
+      uom: item?.uom,
+      category: item?.category,
+      current_stock: item?.current_stock,
+      price: item?.price,
+      approved: item?.approved,
+      item_type: item?.item_type,
+      product_or_service: item?.product_or_service,
+      store: item?.store,
+      createdAt: rm.createdAt,
+      updatedAt: rm.updatedAt,
+      __v: rm.__v,
+      change_type: rm.change_type,
+      quantity_changed: rm.quantity_changed,
+    });
+  }
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    unapproved: results,
+  });
+});
 
 // exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
 //   const ext = path.extname(req.file.originalname).toLowerCase();

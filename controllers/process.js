@@ -83,7 +83,8 @@ exports.update = async (req, res) => {
     throw new ErrorHandler("Production Process doesn't exist", 400);
   }
 
-  if (status === "work in progress") {
+  if (status === "production start") { //new
+
     // FINISHED GOOD
     const prevFG = productionProcess.finished_good;
     const currFG = bom.finished_good;
@@ -224,8 +225,6 @@ exports.update = async (req, res) => {
   });
 };
 
-
-
 exports.remove = TryCatch(async (req, res) => {
   const { _id } = req.params;
   if (!_id) {
@@ -313,13 +312,104 @@ exports.all = TryCatch(async (req, res) => {
   const productionProcesses = await ProductionProcess.find().populate(
     "rm_store fg_store scrap_store creator item bom"
   );
-
+// console.log("prodcution proce", productionProcesses);
   res.status(200).json({
     status: 200,
     success: true,
     production_processes: productionProcesses,
   });
 });
+
+exports.requestForAllocation = TryCatch(async (req, res) => {
+  const { _id } = req.query;
+  // console.log("Request for allocation ID:", _id);
+
+  if (!_id) {
+    throw new ErrorHandler("ID not provided", 400);
+  }
+console.log("Request for allocation for process ID:", _id);
+  const process = await ProductionProcess.findById(_id);
+  if (!process) {
+    throw new ErrorHandler("Production process not found", 404);
+  }
+// console.log("Current process status:", process);
+  process.status = "request for allow inventory";
+  await process.save();
+// console.log("Updated process status:", process);
+  res.status(200).json({
+    success: true,
+    message: "Status updated to 'Request for allocation'",
+    updated: process,
+  });
+});
+exports.markInventoryInTransit = TryCatch(async (req, res) => {
+  const { _id } = req.body; // Process ID
+  // console.log("Marking inventory in transit for process ID:", _id);
+  if (!_id) {
+    throw new ErrorHandler("Process ID is required", 400);
+  }
+
+  const process = await ProductionProcess.findById(_id);
+  if (!process) {
+    throw new ErrorHandler("Production process not found", 404);
+  }
+
+  process.status = "inventory in transit";
+  await process.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Status updated to 'inventory in transit'",
+    updated: process,
+  });
+});
+exports.startProduction = async (req, res) => {
+  try {
+    const { _id } = req.body; // production process ID
+
+    if (!_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Production process ID is required",
+      });
+    }
+
+    const process = await ProductionProcess.findById(_id);
+    if (!process) {
+      return res.status(404).json({
+        success: false,
+        message: "Production process not found",
+      });
+    }
+
+    // Optional: Check if current status is "inventory in transit"
+    if (process.status !== "inventory in transit") {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot start production. Current status is '${process.status}'`,
+      });
+    }
+
+    process.status = "production started";
+    process.productionStartedAt = new Date();
+    await process.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Production started successfully",
+      process,
+    });
+  } catch (error) {
+    console.error("Error in startProduction:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: error.message,
+    });
+  }
+}; // yeeeee
+
+
 exports.markDone = TryCatch(async (req, res) => {
   const { _id } = req.params;
   if (!_id) {
@@ -340,6 +430,24 @@ exports.markDone = TryCatch(async (req, res) => {
   });
 });
 
+exports.updateStatus = TryCatch(async (req, res) => {
+  const { _id, status } = req.body;
+  if (!_id || !status) {
+    throw new ErrorHandler("Status or ID not provided", 400);
+  }
+
+  const process = await ProductionProcess.findById(_id);
+  if (!process) throw new ErrorHandler("Production process not found", 404);
+
+  process.status = status;
+  await process.save();
+
+  res.status(200).json({
+    success: true,
+    message: `Production status updated to ${status}`,
+    updated: process,
+  });
+});
 
 
 

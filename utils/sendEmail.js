@@ -21,7 +21,7 @@ exports.sendEmail = async (sub, msg, recipientEmail) => {
         <html>
           <body>
             ${msg}
-          </body>
+          </body> 
         </html>
         `,
   };
