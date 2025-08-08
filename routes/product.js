@@ -13,6 +13,7 @@ const {
   downloadSampleTemplate,
   exportToExcelIndirect,
   downloadSampleTemplateIndirect,
+  rawMaterials,
 } = require("../controllers/product");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 const { isSuper } = require("../middlewares/isSuper");
