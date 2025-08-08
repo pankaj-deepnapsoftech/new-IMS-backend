@@ -1,4 +1,4 @@
-const { Schema, model } = require("mongoose");
+const { Schema, model, default: mongoose } = require("mongoose");
 
 
 const bomSchema = new Schema(
@@ -24,8 +24,31 @@ const bomSchema = new Schema(
       type: [Schema.Types.ObjectId],
       ref: "BOM-Scrap-Material",
     },
-   
-    
+    resources: [
+      {
+        resource_id: {
+          type: Schema.Types.ObjectId,
+          ref: 'Resource',
+          required: true,
+        },
+        type: { type: String },
+        specification: { type: String },
+      }
+    ]
+,   
+    manpower: [
+      {
+        user: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        role: { type: String },
+        working_hours: { type: Number },
+      },
+    ],
+
+
     processes: {
       type: [String],
       set: (value) => {

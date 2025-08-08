@@ -90,9 +90,13 @@ exports.details = TryCatch(async (req, res) => {
 });
 
 exports.all = TryCatch(async (req, res) => {
-  const proformaInvoices = await ProformaInvoice.find().populate(
-    "creator buyer supplier store"
-  );
+  const proformaInvoices = await ProformaInvoice.find()
+    .sort({ createdAt: -1 }) // <-- Sort latest first
+    .populate([
+      { path: "creator", model: "User" },
+      { path: "buyer", model: "Parties" },
+      { path: "store", model: "Store" }
+    ]);
 
   res.status(200).json({
     status: 200,

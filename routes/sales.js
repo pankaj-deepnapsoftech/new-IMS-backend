@@ -13,6 +13,8 @@ const { isAuthenticated } = require("../middlewares/isAuthenticated");
 // const { isSuper } = require("../middlewares/isSuper");
 const { isAllowed } = require("../middlewares/isAllowed");
 const { Imageupload } = require("../utils/upload");
+const { Validater } = require("../validation/Validator");
+const { SalesValidation } = require("../validation/sales.validation");
 
 const router = express.Router();
 
@@ -20,7 +22,7 @@ const router = express.Router();
 // router.get("/all", isAuthenticated, all);
 // router.get("/wip", isAuthenticated, workInProgressProducts);
 // router.get("/unapproved", isAuthenticated, isSuper, unapproved);
-router.post("/create", isAuthenticated, create);
+router.post("/create", isAuthenticated, Validater(SalesValidation), create);
 
 // router.get("/:id", isAuthenticated, isAllowed, details);
 
@@ -29,7 +31,7 @@ router.put("/update/:id", isAuthenticated, update);
 router.patch(
   "/upload-image/:id",
   isAuthenticated, // second image  upload
-   Imagehandler
+  Imagehandler
 );
 
 router.put(
