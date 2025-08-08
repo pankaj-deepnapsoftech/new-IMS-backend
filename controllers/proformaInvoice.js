@@ -6,10 +6,10 @@ exports.create = TryCatch(async (req, res) => {
   if (!proformaInvoice) {
     throw new ErrorHandler("Please provide all the fields", 400);
   }
+
   const createdProformaInvoice = await ProformaInvoice.create({
     ...proformaInvoice,
     creator: req.user._id,
-    buyer: proformaInvoice.buyer || defaultBuyerId  // if you have a default buyer
   });
 
   res.status(200).json({
@@ -105,7 +105,6 @@ exports.all = TryCatch(async (req, res) => {
     proforma_invoices: proformaInvoices,
   });
 });
-
 
 exports.getNextInvoiceNumber = TryCatch(async (req, res) => {
   // Prevent misuse of the route with an _id parameter

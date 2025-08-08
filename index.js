@@ -30,7 +30,7 @@ const app = express();
 // require("dotenv").config({ path: `.env.development` });
 
 // PRODUCTION ENVIRONMENT
-require('dotenv').config({ path: `.env.production` });
+require('dotenv').config();
 
 const allowedOrigins = [
   "http://localhost:3000",
