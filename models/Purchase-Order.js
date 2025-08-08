@@ -12,8 +12,8 @@ const PurchaseOrderSchema = new mongoose.Schema(
 
     poOrder: { type: String },
     date: { type: String },
+    itemName: { type: String },
 
-   
     supplierName: { type: String },
     supplierCode: { type: String },
     supplierPan: { type: String, required: false },
@@ -27,19 +27,17 @@ const PurchaseOrderSchema = new mongoose.Schema(
     packagingAndForwarding: { type: String },
     freightCharges: { type: String, required: false },
     modeOfPayment: { type: String },
-    deliveryAddress: { type: String },
-    deliveryPeriod: { type: String },
-    billingAddress: { type: String },
-    paymentTerms: { type: String },
-
+    deliveryPeriod: { type: String, required: false },
+    billingAddress: { type: String, required: false },
+    paymentTerms: { type: String, required: false },
     additionalRemarks: { type: String, required: false },
     additionalImportant: { type: String, required: false },
+    creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   },
   {
     timestamps: true,
   }
 );
-
 
 const PurchaseOrder = mongoose.model("Purchase-Order", PurchaseOrderSchema);
 module.exports = PurchaseOrder;

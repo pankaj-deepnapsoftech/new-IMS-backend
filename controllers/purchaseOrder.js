@@ -1,6 +1,7 @@
 const { PartiesModels } = require("../models/Parties");
 const PurchaseOrder = require("../models/Purchase-Order");
 const { TryCatch, ErrorHandler } = require("../utils/error");
+const { generatePONumber } = require("../utils/generatePONumber");
 
 exports.create = TryCatch(async (req, res) => {
   const purchaseOrder = req.body;
@@ -8,8 +9,12 @@ exports.create = TryCatch(async (req, res) => {
     throw new ErrorHandler("Please provide all the fields", 400);
   }
 
+  // Generate automatic PO number
+  const poNumber = await generatePONumber();
+
   const createdPurchaseOrder = await PurchaseOrder.create({
     ...purchaseOrder,
+    poOrder: poNumber, // Override with auto-generated number
     creator: req.user._id,
   });
 
@@ -20,6 +25,18 @@ exports.create = TryCatch(async (req, res) => {
     message: "Purchase Order created successfully",
   });
 });
+
+exports.getNextPONumber = TryCatch(async (req, res) => {
+  const poNumber = await generatePONumber();
+  
+  res.status(200).json({
+    status: 200,
+    success: true,
+    poNumber: poNumber,
+    message: "Next PO number generated successfully",
+  });
+});
+
 exports.allSuppliers = TryCatch(async (req, res) => {
   const sellers = await PartiesModels.find(
     { parties_type: "Seller" },

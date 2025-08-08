@@ -9,7 +9,8 @@ const {
   bulkUploadHandler, 
   workInProgressProducts,
   exportToExcel,
-  downloadSampleTemplate
+  downloadSampleTemplate,
+  rawMaterials
 } = require("../controllers/product");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 const { isSuper } = require("../middlewares/isSuper");
@@ -27,6 +28,7 @@ router.route("/")
 router.get("/all", isAuthenticated, all);
 router.get("/wip", isAuthenticated, workInProgressProducts);
 router.get("/unapproved", isAuthenticated, isSuper, unapproved);
+router.get("/raw-materials", isAuthenticated, rawMaterials);
 router.get("/:id", isAuthenticated, isAllowed, details);
 
 // Bulk operations

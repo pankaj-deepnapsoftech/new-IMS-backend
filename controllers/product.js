@@ -506,7 +506,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
   // Set response headers
   res.setHeader(
     "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"   
   );
   res.setHeader(
     "Content-Disposition",
@@ -516,4 +516,16 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
   // Write and send file
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   res.send(buffer);
+});
+
+exports.rawMaterials = TryCatch(async (req, res) => {
+  const rawMaterials = await Product.find({
+    category: "raw materials",
+    approved: true
+  }).select("name _id");
+  res.status(200).json({
+    status: 200,
+    success: true,
+    rawMaterials,
+  });
 });
