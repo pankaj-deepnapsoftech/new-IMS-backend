@@ -1,6 +1,5 @@
-const { Schema, model, default: mongoose } = require("mongoose");
-
-
+//bom model
+const { Schema, model } = require("mongoose");
 const bomSchema = new Schema(
   {
     creator: {
@@ -35,9 +34,20 @@ const bomSchema = new Schema(
         specification: { type: String },
       }
     ]
-,
+,   
+    manpower: [
+      {
+        user: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        role: { type: String },
+        working_hours: { type: Number },
+      },
+    ],
 
-    
+
     processes: {
       type: [String],
       set: (value) => {

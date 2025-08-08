@@ -6,14 +6,14 @@ const {
   details,
   update,
   remove,
-  allSuppliers, 
+  allSuppliers,
+  getNextPONumber,
 } = require("../controllers/purchaseOrder");
 const router = express.Router();
 
 router.post("/", isAuthenticated, create);
 router.get("/all", isAuthenticated, all);
-
-
+router.get("/next-po-number", isAuthenticated, getNextPONumber);
 router.get("/suppliers", isAuthenticated, allSuppliers);
 
 router.route("/:_id")

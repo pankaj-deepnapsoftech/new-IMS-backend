@@ -4,7 +4,7 @@ const { TryCatch, ErrorHandler } = require("../utils/error");
 const User = require("../models/user");
 const OTP = require("../models/otp");
 const { generateOTP } = require("../utils/generateOTP");
-const { sendEmail } = require("../utils/sendEmail");
+const { sendEmail } = require("../utils/sendEmail"); 
 
 exports.create = TryCatch(async (req, res) => {
   const userDetails = req.body;

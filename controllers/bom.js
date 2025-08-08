@@ -1,10 +1,11 @@
-const mongoose = require('mongoose');
+//bom controller
 const BOM = require("../models/bom");
 const BOMFinishedMaterial = require("../models/bom-finished-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
 const BOMScrapMaterial = require("../models/bom-scrap-material");
 const ProductionProcess = require("../models/productionProcess");
 const Product = require("../models/product");
+const Item = require("../models/product");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 const path = require("path");
 const fs = require("fs");
@@ -24,7 +25,8 @@ exports.create = TryCatch(async (req, res) => {
     scrap_materials,
     other_charges,
     remarks,
-    resources
+    resources,
+    manpower
   } = req.body;
 
   let insuffientStockMsg = "";
@@ -91,7 +93,7 @@ exports.create = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-  });
+    manpower  });
 
   if (raw_materials) {
     const bom_raw_materials = await Promise.all(
@@ -134,26 +136,27 @@ exports.create = TryCatch(async (req, res) => {
       bom,
     });
   }
-  await Promise.all(
-    raw_materials.map(async (material) => {
-      const product = await Product.findById(material.item);
-      if (product) {
-        product.current_stock =
-          (product.current_stock || 0) - material.quantity;
-        product.change_type = "decrease";
-        product.quantity_changed = material.quantity;
-        await product.save();
-      }
-    })
-  );
-  const finishedProduct = await Product.findById(finished_good.item);
-  if (finishedProduct) {
-    finishedProduct.current_stock =
-      (finishedProduct.current_stock || 0) + finished_good.quantity;
-    finishedProduct.change_type = "increase";
-    finishedProduct.quantity_changed = finished_good.quantity;
-    await finishedProduct.save();
-  }
+  // await Promise.all(
+  //   raw_materials.map(async (material) => {
+  //     const product = await Product.findById(material.item);
+  //     if (product) {
+  //       product.current_stock =
+  //         (product.current_stock || 0) - material.quantity;
+  //       product.change_type = "decrease";
+  //       product.quantity_changed = material.quantity;
+  //       await product.save();
+  //     }
+
+  //   })
+  // );
+  // const finishedProduct = await Product.findById(finished_good.item);
+  // if (finishedProduct) {
+  //   finishedProduct.current_stock =
+  //     (finishedProduct.current_stock || 0) + finished_good.quantity;
+  //   finishedProduct.change_type = "increase";
+  //   finishedProduct.quantity_changed = finished_good.quantity;
+  //   await finishedProduct.save();
+  // }
 
   res.status(200).json({
     status: 200,
@@ -176,6 +179,7 @@ exports.update = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
+    manpower
   } = req.body;
   if (!id) {
     throw new ErrorHandler("id not provided", 400);
@@ -407,6 +411,17 @@ exports.update = TryCatch(async (req, res) => {
   if (typeof remarks === "string") {
     bom.remarks = remarks.trim();
   }
+  if (Array.isArray(manpower)) {
+    // Validate each manpower entry has a user
+    const validManpower = manpower.filter(mp => mp.user);
+    bom.manpower = validManpower;
+  }
+  if (Array.isArray(resources)) {
+    const validResources = resources.filter(res => res.resource_id);
+    bom.resources = validResources;
+  }
+
+
   bom_name && bom_name.trim().length > 0 && (bom.bom_name = bom_name);
   parts_count && parts_count > 0 && (bom.parts_count = parts_count);
   total_cost && (bom.total_cost = total_cost);
@@ -536,66 +551,73 @@ exports.details = TryCatch(async (req, res) => {
     bom,
   });
 });
-exports.all = TryCatch(async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 100;
-  const skip = (page - 1) * limit;
+  exports.all = TryCatch(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100;
+    const skip = (page - 1) * limit;
 
-  const boms = await BOM.find({ approved: true })
-    .populate("approved_by", "first_name last_name")
-    .populate({
-      path: "finished_good",
-      select: "item quantity",
-      populate: {
-        path: "item",
-        select: "name",
-      },
-    })
-    .populate({
-      path: "raw_materials",
-      select: "item quantity",
-      populate: {
-        path: "item",
-        select: "name",
-      },
-    })
-    .populate({
-      path: "scrap_materials",
-      select: "item quantity",
-      populate: {
-        path: "item",
-        select: "name",
-      },
-    })
-    .populate({
-      path: "resources.resource_id",
-      select: "name type specification",
-    })
-    .sort({ updatedAt: -1 })
-    .skip(skip)
-    .limit(limit);
+    const boms = await BOM.find({ approved: true })
+      .populate({
+        path: "manpower.user",
+        select: "first_name last_name email phone employeeId role",
+      })
 
-  // ✅ Transform resources inside each BOM
-  const transformedBoms = boms.map((bom) => {
-    const bomObj = bom.toObject();
-    bomObj.resources = bomObj.resources.map((res) => ({
-      name: res.resource_id?.name || '',
-      type: res.resource_id?.type || res.type,
-      specification: res.resource_id?.specification || res.specification,
-    }));
-    return bomObj;
+      .populate({
+        path: "finished_good",
+        select: "item quantity",
+        populate: {
+          path: "item",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "raw_materials",
+        select: "item quantity",
+        populate: {
+          path: "item",
+          select: "name",
+        },
+      }) 
+      .populate({
+        path: "scrap_materials",
+        select: "item quantity",
+        populate: {
+          path: "item",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "resources.resource_id",
+        select: "name type specification",
+      })
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+ 
+
+
+    const transformedBoms = boms.map((bom) => {
+      const bomObj = bom.toObject();
+      bomObj.resources = bomObj.resources.map((res) => ({
+        name: res.resource_id?.name || '',
+        type: res.resource_id?.type || res.type,
+        specification: res.resource_id?.specification || res.specification,
+      }));
+      
+      return bomObj;
+    });
+
+    res.status(200).json({
+      status: 200,
+      success: true,
+      message: "Approved BOMs fetched successfully",
+      count: transformedBoms.length,
+      page,
+      limit,
+      boms: transformedBoms,
+    });
   });
-
-  res.status(200).json({
-    status: 200,
-    success: true,
-    message: "Approved BOMs fetched successfully",
-    count: transformedBoms.length,
-    page,
-    limit,
-    boms: transformedBoms,
-  });
-});
 
 
 exports.unapproved = TryCatch(async (req, res) => {
@@ -916,6 +938,7 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
     })
     .populate({
       path: "bom",
+      // match: { production_process: { $exists: true } }, //new condition to filter BOMs with production_process
       populate: {
         path: "raw_materials",
         populate: {
@@ -924,17 +947,20 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
       },
     });
 
-  const unapprovedRawMaterials = unapprovedProducts.flatMap((prod) => {
-    const rm = prod.bom.raw_materials.filter(
-      (i) => i.item._id.toString() === prod.item.toString()
-    )[0];
+ const unapprovedRawMaterials = unapprovedProducts.flatMap((prod) => {
+  const rm = prod.bom.raw_materials.find(
+    (i) => i.item._id.toString() === prod.item.toString()
+  );
 
-    return {
-      bom_name: prod.bom._doc.bom_name,
-      ...rm.item._doc,
-      _id: prod._id,
-    };
-  });
+  return {
+    bom_id: prod.bom._id, // required to update status
+    bom_name: prod.bom.bom_name,
+    bom_status: prod.bom.production_process_status || "raw material approval pending", // optional fallback
+    ...rm.item._doc,
+    _id: prod._id, // raw material ID
+  };
+});
+
 
   res.status(200).json({
     status: 200,
@@ -967,7 +993,7 @@ exports.approveRawMaterial = TryCatch(async (req, res) => {
 
   if (areAllApproved && requiredBom.production_process) {
     await ProductionProcess.findByIdAndUpdate(requiredBom.production_process, {
-      status: "raw materials approved",
+      status: "Inventory Allocated",
     });
   }
 
@@ -1007,8 +1033,60 @@ exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
   });
 });
 
+exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
+  const allRawMaterials = await BOMRawMaterial.find()
+    .populate("item") // ✅ To get product details like name, product_id, price
+    .populate({
+      path: "bom",
+      select: "bom_name production_process",
+      populate: {
+        path: "raw_materials.item", // fully populate nested items
+      },
+    });
 
+  const results = [];
 
+  for (const rm of allRawMaterials) {
+    const bom = rm.bom;
+
+    if (!bom || !bom.production_process) continue;
+
+    const productionProcess = await ProductionProcess.findById(bom.production_process);
+    if (!productionProcess) continue;
+
+    const item = rm.item;
+
+    results.push({
+      _id: rm._id,
+      bom_id: bom._id,
+      bom_name: bom.bom_name,
+      bom_status: productionProcess.status,
+      production_process_id: productionProcess._id,
+      product_id: item?.product_id,
+      name: item?.name,
+      inventory_category: item?.inventory_category,
+      uom: item?.uom,
+      category: item?.category,
+      current_stock: item?.current_stock,
+      price: item?.price,
+      approved: item?.approved,
+      item_type: item?.item_type,
+      product_or_service: item?.product_or_service,
+      store: item?.store,
+      createdAt: rm.createdAt,
+      updatedAt: rm.updatedAt,
+      __v: rm.__v,
+      change_type: rm.change_type,
+      quantity_changed: rm.quantity_changed,
+    });
+  }
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    unapproved: results,
+  });
+});
 
 // exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
 //   const ext = path.extname(req.file.originalname).toLowerCase();
