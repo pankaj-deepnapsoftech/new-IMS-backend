@@ -82,7 +82,6 @@ exports.Imagehandler = TryCatch(async (req, res) => {
   // Save designFile URL in DB
   await Purchase.findByIdAndUpdate(id, {
     designFile: designFile,
-      
   });
 
   // Update assignment status
@@ -198,6 +197,8 @@ exports.getAll = TryCatch(async (req, res) => {
               consignee_name: 2,
               contact_number: 2,
               cust_id: 1,
+              company_name: 1,
+              bill_to: 1,
             },
           },
         ],
@@ -367,6 +368,8 @@ exports.getOne = TryCatch(async (req, res) => {
               consignee_name: 1,
               contact_number: 1,
               cust_id: 1,
+              company_name: 1,
+              bill_to: 1,
             },
           },
         ],
@@ -502,7 +505,7 @@ exports.Delivered = TryCatch(async (req, res) => {
         message: "data not found",
       });
     }
-
+ 
     const path = `https://rtpasbackend.deepmart.shop/images/${filename}`;
     console.log("req.body.role=", req.body.role);
     if ((req.body.role = "Dispatcher")) {

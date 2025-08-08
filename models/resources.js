@@ -17,6 +17,11 @@ const resourcesSchema = new Schema(
       type: String,
       maxlength: [200, "Specification cannot exceed 200 characters"],
     },
+    customId: {
+      type: String,
+      required: true,
+      unique: true, // Important to prevent duplicates like "customer-feedback-001"
+    },
   },
   {
     timestamps: true,

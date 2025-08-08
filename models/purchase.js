@@ -3,7 +3,7 @@ const { Schema, model } = require("mongoose");
 const Purchases = new Schema(
   {
     user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
-    order_id: { type: String,  unique: true },
+    order_id: { type: String, unique: true },
     party: {
       type: Schema.Types.ObjectId,
       ref: "Parties",
@@ -15,8 +15,8 @@ const Purchases = new Schema(
     price: { type: Number, required: true, trim: true },
     product_qty: { type: Number, required: true, trim: true, default: 0 },
     GST: { type: Number, trim: true },
-    productFile: { type: String },///
-    designFile: { type: String },///
+    productFile: { type: String }, ///
+    designFile: { type: String }, ///
     bompdf: { type: String },
     uom: {
       type: String,
@@ -60,6 +60,12 @@ const Purchases = new Schema(
     half_payment_approve: { type: Boolean },
     delivery_status_by_customer: { type: String, trim: true },
     delivery_status_comment_by_customer: { type: String, trim: true },
+    mode_of_payment: {
+      type: String,
+      enum: ["cash", "cheque", "NEFT/RTGS", "UPI"],
+      required: true,
+      trim: true,
+    },
   },
   { timestamps: true }
 );
