@@ -21,4 +21,4 @@ router.route('/:id')
 router.get('/bom/:_id', isAuthenticated, findFinishedGoodBom);
 router.route('/:id')
         .put(isAuthenticated, isAllowed, update)
-module.exports = router;
+module.exports = router; 

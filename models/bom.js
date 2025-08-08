@@ -35,9 +35,20 @@ const bomSchema = new Schema(
         specification: { type: String },
       }
     ]
-,
+,   
+    manpower: [
+      {
+        user: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        role: { type: String },
+        working_hours: { type: Number },
+      },
+    ],
 
-    
+
     processes: {
       type: [String],
       set: (value) => {

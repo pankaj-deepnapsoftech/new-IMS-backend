@@ -24,7 +24,8 @@ exports.create = TryCatch(async (req, res) => {
     scrap_materials,
     other_charges,
     remarks,
-    resources
+    resources,
+    manpower
   } = req.body;
 
   let insuffientStockMsg = "";
@@ -91,7 +92,7 @@ exports.create = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-  });
+    manpower  });
 
   if (raw_materials) {
     const bom_raw_materials = await Promise.all(
@@ -176,6 +177,7 @@ exports.update = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
+    manpower
   } = req.body;
   if (!id) {
     throw new ErrorHandler("id not provided", 400);
@@ -407,6 +409,17 @@ exports.update = TryCatch(async (req, res) => {
   if (typeof remarks === "string") {
     bom.remarks = remarks.trim();
   }
+  if (Array.isArray(manpower)) {
+    // Validate each manpower entry has a user
+    const validManpower = manpower.filter(mp => mp.user);
+    bom.manpower = validManpower;
+  }
+  if (Array.isArray(resources)) {
+    const validResources = resources.filter(res => res.resource_id);
+    bom.resources = validResources;
+  }
+
+
   bom_name && bom_name.trim().length > 0 && (bom.bom_name = bom_name);
   parts_count && parts_count > 0 && (bom.parts_count = parts_count);
   total_cost && (bom.total_cost = total_cost);
@@ -536,66 +549,73 @@ exports.details = TryCatch(async (req, res) => {
     bom,
   });
 });
-exports.all = TryCatch(async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 100;
-  const skip = (page - 1) * limit;
+  exports.all = TryCatch(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 100;
+    const skip = (page - 1) * limit;
 
-  const boms = await BOM.find({ approved: true })
-    .populate("approved_by", "first_name last_name")
-    .populate({
-      path: "finished_good",
-      select: "item quantity",
-      populate: {
-        path: "item",
-        select: "name",
-      },
-    })
-    .populate({
-      path: "raw_materials",
-      select: "item quantity",
-      populate: {
-        path: "item",
-        select: "name",
-      },
-    })
-    .populate({
-      path: "scrap_materials",
-      select: "item quantity",
-      populate: {
-        path: "item",
-        select: "name",
-      },
-    })
-    .populate({
-      path: "resources.resource_id",
-      select: "name type specification",
-    })
-    .sort({ updatedAt: -1 })
-    .skip(skip)
-    .limit(limit);
+    const boms = await BOM.find({ approved: true })
+      .populate({
+        path: "manpower.user",
+        select: "first_name last_name email phone employeeId role",
+      })
 
-  // ✅ Transform resources inside each BOM
-  const transformedBoms = boms.map((bom) => {
-    const bomObj = bom.toObject();
-    bomObj.resources = bomObj.resources.map((res) => ({
-      name: res.resource_id?.name || '',
-      type: res.resource_id?.type || res.type,
-      specification: res.resource_id?.specification || res.specification,
-    }));
-    return bomObj;
+      .populate({
+        path: "finished_good",
+        select: "item quantity",
+        populate: {
+          path: "item",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "raw_materials",
+        select: "item quantity",
+        populate: {
+          path: "item",
+          select: "name",
+        },
+      }) 
+      .populate({
+        path: "scrap_materials",
+        select: "item quantity",
+        populate: {
+          path: "item",
+          select: "name",
+        },
+      })
+      .populate({
+        path: "resources.resource_id",
+        select: "name type specification",
+      })
+      .sort({ updatedAt: -1 })
+      .skip(skip)
+      .limit(limit);
+
+ 
+
+
+    const transformedBoms = boms.map((bom) => {
+      const bomObj = bom.toObject();
+      bomObj.resources = bomObj.resources.map((res) => ({
+        name: res.resource_id?.name || '',
+        type: res.resource_id?.type || res.type,
+        specification: res.resource_id?.specification || res.specification,
+      }));
+      
+      return bomObj;
+    });
+
+    res.status(200).json({
+      status: 200,
+      success: true,
+      message: "Approved BOMs fetched successfully",
+      count: transformedBoms.length,
+      page,
+      limit,
+      boms: transformedBoms,
+    });
   });
-
-  res.status(200).json({
-    status: 200,
-    success: true,
-    message: "Approved BOMs fetched successfully",
-    count: transformedBoms.length,
-    page,
-    limit,
-    boms: transformedBoms,
-  });
-});
 
 
 exports.unapproved = TryCatch(async (req, res) => {
@@ -952,19 +972,41 @@ if(result.length === 0){
 // await finalBom.save();
  // Fetch original BOM document with populate
 
+  // const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
+
+  // // Modify quantity in populated finished_good
+  // bomDoc.finished_good.quantity = Number(quantity);
+
+  // // Convert populated finished_good back to ObjectId for saving in BOM doc
+  // bomDoc.finished_good = bomDoc.finished_good._id;
+
+  // // Create a plain object copy without _id (so that new document can be created)
+  // const newBomData = bomDoc.toObject();
+  // delete newBomData._id; 
+
+  // // Create new BOM document with updated data
+  // const finalBom = await BOM.create(newBomData);
+
   const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
 
-  // Modify quantity in populated finished_good
-  bomDoc.finished_good.quantity = Number(quantity);
+  // Make a new copy of finished_good
+  const finishedGoodDoc = bomDoc.finished_good.toObject();
+  delete finishedGoodDoc._id; // Remove old _id to let MongoDB create a new one
 
-  // Convert populated finished_good back to ObjectId for saving in BOM doc
-  bomDoc.finished_good = bomDoc.finished_good._id;
+  // Update the quantity
+  finishedGoodDoc.quantity = Number(quantity);
 
-  // Create a plain object copy without _id (so that new document can be created)
+  // Save new finished_good document
+  const newFinishedGood = await BOMFinishedMaterial.create(finishedGoodDoc);
+
+  // Now prepare BOM
   const newBomData = bomDoc.toObject();
-  delete newBomData._id; 
+  delete newBomData._id; // Remove old BOM _id
 
-  // Create new BOM document with updated data
+  // Replace with new finished_good reference
+  newBomData.finished_good = newFinishedGood._id;
+
+  // Create new BOM
   const finalBom = await BOM.create(newBomData);
 
 console.log("here");
