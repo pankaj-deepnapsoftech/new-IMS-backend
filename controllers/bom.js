@@ -1,4 +1,5 @@
 //bom controller
+const mongoose = require('mongoose')
 const BOM = require("../models/bom");
 const BOMFinishedMaterial = require("../models/bom-finished-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
