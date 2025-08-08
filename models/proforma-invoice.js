@@ -71,6 +71,11 @@ const proformaInvoiceSchema = new Schema({
     total: {
         type: Number,
         required: [true, 'Subtotal is a required field']
+    },
+    payment_mode: {
+        type: String,
+        enum: ['cash', 'credit', 'neft', 'upi', 'cheque', 'debit', 'other'],
+        required: [true, 'Mode of payment is a required field']
     }
 }, {
     timestamps: true
