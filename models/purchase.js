@@ -60,12 +60,20 @@ const Purchases = new Schema(
     half_payment_approve: { type: Boolean },
     delivery_status_by_customer: { type: String, trim: true },
     delivery_status_comment_by_customer: { type: String, trim: true },
-    mode_of_payment: {
-      type: String,
-      enum: ["cash", "cheque", "NEFT/RTGS", "UPI"],
-      required: true,
-      trim: true,
-    },
+ mode_of_payment: {
+  type: String,
+  enum: [
+    "cash",
+    "cheque",
+    "NEFT/RTGS",
+    "UPI",
+    "Credit Card",
+    "Debit Card"
+  ],
+  required: true,
+  trim: true,
+}
+
   },
   { timestamps: true }
 );
