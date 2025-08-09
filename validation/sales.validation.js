@@ -20,3 +20,4 @@ exports.SalesValidation = object({
   .required("Mode of payment is required"),
   comment: string(),
 });
+ 
