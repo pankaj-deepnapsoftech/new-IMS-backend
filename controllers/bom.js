@@ -43,7 +43,7 @@ exports.create = TryCatch(async (req, res) => {
     total_cost === undefined
   ) {
     throw new ErrorHandler("Please provide all the fields", 400);
-  }
+  } 
   if (isNaN(parts_count) || isNaN(total_cost)) {
     throw new ErrorHandler("Part's count and Total cost must be a number", 400);
   }
