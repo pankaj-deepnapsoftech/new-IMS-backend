@@ -14,8 +14,6 @@ const fs = require("fs");
 const csv = require("csvtojson");
 const { parseExcelFile } = require("../utils/parseExcelFile");
 
-
-
 exports.create = TryCatch(async (req, res) => {
   const {
     raw_materials,
@@ -102,13 +100,13 @@ exports.create = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-    manpower
+    manpower,
   });
 
   if (raw_materials) {
     const bom_raw_materials = await Promise.all(
       raw_materials.map(async (material) => {
-        await Product.findById(material.item);
+        const isExistingMaterial = await Product.findById(material.item);
         const createdMaterial = await BOMRawMaterial.create({
           ...material,
           bom: bom._id,
@@ -116,14 +114,16 @@ exports.create = TryCatch(async (req, res) => {
         return createdMaterial._id;
       })
     );
+
     bom.raw_materials = bom_raw_materials;
     await bom.save();
   }
 
+  let bom_scrap_materials;
   if (scrap_materials) {
-    const bom_scrap_materials = await Promise.all(
+    bom_scrap_materials = await Promise.all(
       scrap_materials.map(async (material) => {
-        await Product.findById(material.item);
+        const isExistingMaterial = await Product.findById(material.item);
         const createdMaterial = await BOMScrapMaterial.create({
           ...material,
           bom: bom._id,
@@ -131,11 +131,10 @@ exports.create = TryCatch(async (req, res) => {
         return createdMaterial._id;
       })
     );
+
     bom.scrap_materials = bom_scrap_materials;
     await bom.save();
   }
-
-
 
   if (insuffientStockMsg) {
     return res.status(400).json({
@@ -145,6 +144,27 @@ exports.create = TryCatch(async (req, res) => {
       bom,
     });
   }
+  // await Promise.all(
+  //   raw_materials.map(async (material) => {
+  //     const product = await Product.findById(material.item);
+  //     if (product) {
+  //       product.current_stock =
+  //         (product.current_stock || 0) - material.quantity;
+  //       product.change_type = "decrease";
+  //       product.quantity_changed = material.quantity;
+  //       await product.save();
+  //     }
+
+  //   })
+  // );
+  // const finishedProduct = await Product.findById(finished_good.item);
+  // if (finishedProduct) {
+  //   finishedProduct.current_stock =
+  //     (finishedProduct.current_stock || 0) + finished_good.quantity;
+  //   finishedProduct.change_type = "increase";
+  //   finishedProduct.quantity_changed = finished_good.quantity;
+  //   await finishedProduct.save();
+  // }
 
   res.status(200).json({
     status: 200,
@@ -153,8 +173,6 @@ exports.create = TryCatch(async (req, res) => {
     bom,
   });
 });
-
-
 exports.update = TryCatch(async (req, res) => {
   const { id } = req.params;
   const {
@@ -1123,6 +1141,7 @@ exports.autoBom = TryCatch(async (req, res) => {
   });
 });
 
+
 exports.findFinishedGoodBom = TryCatch(async (req, res) => {
   const { _id } = req.params;
   if (!_id) {
@@ -1330,7 +1349,6 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
     const productionProcess = await ProductionProcess.findById(bom.production_process);
     if (!productionProcess) continue;
 
-  
     const item = rm.item;
 
     results.push({
