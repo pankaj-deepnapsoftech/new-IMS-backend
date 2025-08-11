@@ -1,8 +1,12 @@
 const { Schema, model, default: mongoose } = require("mongoose");
 
-
 const bomSchema = new Schema(
   {
+    bom_id: {
+      type: String,
+      unique: true,
+      required: [true, "BOM ID is a required field"],
+    },
     creator: {
       type: Schema.Types.ObjectId,
       ref: "User",
@@ -28,14 +32,13 @@ const bomSchema = new Schema(
       {
         resource_id: {
           type: Schema.Types.ObjectId,
-          ref: 'Resource',
+          ref: "Resource",
           required: true,
         },
         type: { type: String },
         specification: { type: String },
-      }
-    ]
-,   
+      },
+    ],
     manpower: [
       {
         user: {
@@ -47,7 +50,6 @@ const bomSchema = new Schema(
         working_hours: { type: Number },
       },
     ],
-
 
     processes: {
       type: [String],
@@ -63,7 +65,7 @@ const bomSchema = new Schema(
       },
     },
     finished_good: {
-      type: Schema.Types.ObjectId,  
+      type: Schema.Types.ObjectId,
       ref: "BOM-Finished-Material",
       required: [true, "Finished good is a required field"],
     },
@@ -109,8 +111,8 @@ const bomSchema = new Schema(
       type: Number,
       required: [true, "Total cost is a required field"],
     },
-    remarks:{
-      type:String,
+    remarks: {
+      type: String,
     },
   },
   {

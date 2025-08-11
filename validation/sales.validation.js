@@ -15,7 +15,7 @@ exports.SalesValidation = object({
   mode_of_payment: string()
     .required("Mode of payment is a required field")
     .oneOf(
-      ["cash", "cheque", "NEFT/RTGS", "UPI"],
+      ["Cash", "Cheque", "NEFT/RTGS", "UPI", "Debit Card", "Credit Card"],
       "Mode of payment must be one of: cash, cheque, NEFT/RTGS, UPI"
     ),
   comment: string(),
