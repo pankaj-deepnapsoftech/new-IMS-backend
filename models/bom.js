@@ -1,5 +1,5 @@
-const { Schema, model, default: mongoose } = require("mongoose");
-
+//bom model
+const { Schema, model } = require("mongoose");
 const bomSchema = new Schema(
   {
     bom_id: {

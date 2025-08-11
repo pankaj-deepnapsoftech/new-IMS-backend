@@ -1,23 +1,9 @@
-const express = require("express");
-const {
-  create,
-  unapproved,
-  approved,
-  update,
-  autoBom,
-  remove,
-  details,
-  all,
-  findFinishedGoodBom,
-  unapprovedRawMaterials,
-  approveRawMaterial,
-  approveRawMaterialForAdmin,
-  unapprovedRawMaterialsForAdmin,
-  bomsGroupedByWeekDay,
-} = require("../controllers/bom");
-const { isAuthenticated } = require("../middlewares/isAuthenticated");
-const { isAllowed } = require("../middlewares/isAllowed");
-const { isSuper } = require("../middlewares/isSuper");
+//bom routes
+const express = require('express');
+const { create, unapproved, update,approved, remove, details, all, autoBom,findFinishedGoodBom, unapprovedRawMaterials, approveRawMaterial, approveRawMaterialForAdmin, unapprovedRawMaterialsForAdmin, bomsGroupedByWeekDay, bulkUploadBOMHandler, allRawMaterialsForInventory } = require('../controllers/bom');
+const { isAuthenticated } = require('../middlewares/isAuthenticated');
+const { isAllowed } = require('../middlewares/isAllowed');
+const { isSuper } = require('../middlewares/isSuper');
 const { Validater } = require("../validation/Validator");
 const { BOMValidation } = require("../validation/bom.validation");
 const router = express.Router();
