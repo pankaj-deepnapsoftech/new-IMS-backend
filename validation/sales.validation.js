@@ -12,11 +12,11 @@ exports.SalesValidation = object({
     .positive("Quantity must be positive"),
   GST: number().min(0, "GST cannot be negative"),
   uom: string().required("Unit of measurement is a required field"),
- mode_of_payment:string()
-  .oneOf(
-    ["cash", "cheque", "NEFT/RTGS", "UPI", "Credit Card", "Debit Card"],
-    "Select a valid mode of payment"
-  )
-  .required("Mode of payment is required"),
+  mode_of_payment: string()
+    .required("Mode of payment is a required field")
+    .oneOf(
+      ["Cash", "Cheque", "NEFT/RTGS", "UPI", "Debit Card", "Credit Card"],
+      "Mode of payment must be one of: cash, cheque, NEFT/RTGS, UPI"
+    ),
   comment: string(),
 });
