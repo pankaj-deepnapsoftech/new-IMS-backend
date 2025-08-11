@@ -1,6 +1,6 @@
 //bom routes
 const express = require('express');
-const { create, unapproved, update,approved, remove, details, all, autoBom,findFinishedGoodBom, unapprovedRawMaterials, approveRawMaterial, approveRawMaterialForAdmin, unapprovedRawMaterialsForAdmin, bomsGroupedByWeekDay, bulkUploadBOMHandler, allRawMaterialsForInventory } = require('../controllers/bom');
+const { create, unapproved, update,approved, remove, details, all, autoBom,findFinishedGoodBom, unapprovedRawMaterials, approveRawMaterial, approveRawMaterialForAdmin, unapprovedRawMaterialsForAdmin, bomsGroupedByWeekDay, bulkUploadBOMHandler, allRawMaterialsForInventory, getInventoryShortages } = require('../controllers/bom');
 const { isAuthenticated } = require('../middlewares/isAuthenticated');
 const { isAllowed } = require('../middlewares/isAllowed');
 const { isSuper } = require('../middlewares/isSuper');
@@ -41,10 +41,11 @@ router.post(
   approveRawMaterial
 );
 router.get("/weekly", isAuthenticated, bomsGroupedByWeekDay);
+router.get("/inventory-shortages", isAuthenticated, getInventoryShortages);
+router.get("/bom/:_id", isAuthenticated, findFinishedGoodBom);
 router
   .route("/:id")
   .delete(isAuthenticated, isAllowed, remove)
-  .get(isAuthenticated, isAllowed, details);
-router.get("/bom/:_id", isAuthenticated, findFinishedGoodBom);
-router.route("/:id").put(isAuthenticated, isAllowed, update);
+  .get(isAuthenticated, isAllowed, details)
+  .put(isAuthenticated, isAllowed, update);
 module.exports = router;
