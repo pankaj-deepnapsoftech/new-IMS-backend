@@ -13,6 +13,8 @@ const fs = require("fs");
 const csv = require("csvtojson");
 const { parseExcelFile } = require("../utils/parseExcelFile");
 
+
+
 exports.create = TryCatch(async (req, res) => {
   const {
     raw_materials,
@@ -94,12 +96,13 @@ exports.create = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-    manpower  });
+    manpower
+  });
 
   if (raw_materials) {
     const bom_raw_materials = await Promise.all(
       raw_materials.map(async (material) => {
-        const isExistingMaterial = await Product.findById(material.item);
+        await Product.findById(material.item);
         const createdMaterial = await BOMRawMaterial.create({
           ...material,
           bom: bom._id,
@@ -107,16 +110,14 @@ exports.create = TryCatch(async (req, res) => {
         return createdMaterial._id;
       })
     );
-
     bom.raw_materials = bom_raw_materials;
     await bom.save();
   }
 
-  let bom_scrap_materials;
   if (scrap_materials) {
-    bom_scrap_materials = await Promise.all(
+    const bom_scrap_materials = await Promise.all(
       scrap_materials.map(async (material) => {
-        const isExistingMaterial = await Product.findById(material.item);
+        await Product.findById(material.item);
         const createdMaterial = await BOMScrapMaterial.create({
           ...material,
           bom: bom._id,
@@ -124,10 +125,11 @@ exports.create = TryCatch(async (req, res) => {
         return createdMaterial._id;
       })
     );
-
     bom.scrap_materials = bom_scrap_materials;
     await bom.save();
   }
+
+
 
   if (insuffientStockMsg) {
     return res.status(400).json({
@@ -137,27 +139,6 @@ exports.create = TryCatch(async (req, res) => {
       bom,
     });
   }
-  // await Promise.all(
-  //   raw_materials.map(async (material) => {
-  //     const product = await Product.findById(material.item);
-  //     if (product) {
-  //       product.current_stock =
-  //         (product.current_stock || 0) - material.quantity;
-  //       product.change_type = "decrease";
-  //       product.quantity_changed = material.quantity;
-  //       await product.save();
-  //     }
-
-  //   })
-  // );
-  // const finishedProduct = await Product.findById(finished_good.item);
-  // if (finishedProduct) {
-  //   finishedProduct.current_stock =
-  //     (finishedProduct.current_stock || 0) + finished_good.quantity;
-  //   finishedProduct.change_type = "increase";
-  //   finishedProduct.quantity_changed = finished_good.quantity;
-  //   await finishedProduct.save();
-  // }
 
   res.status(200).json({
     status: 200,
@@ -166,6 +147,8 @@ exports.create = TryCatch(async (req, res) => {
     bom,
   });
 });
+
+
 exports.update = TryCatch(async (req, res) => {
   const { id } = req.params;
   const {
@@ -552,73 +535,73 @@ exports.details = TryCatch(async (req, res) => {
     bom,
   });
 });
-  exports.all = TryCatch(async (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 100;
-    const skip = (page - 1) * limit;
+exports.all = TryCatch(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 100;
+  const skip = (page - 1) * limit;
 
-    const boms = await BOM.find({ approved: true })
-      .populate({
-        path: "manpower.user",
-        select: "first_name last_name email phone employeeId role",
-      })
+  const boms = await BOM.find({ approved: true })
+    .populate({
+      path: "manpower.user",
+      select: "first_name last_name email phone employeeId role",
+    })
 
-      .populate({
-        path: "finished_good",
-        select: "item quantity",
-        populate: {
-          path: "item",
-          select: "name",
-        },
-      })
-      .populate({
-        path: "raw_materials",
-        select: "item quantity",
-        populate: {
-          path: "item",
-          select: "name",
-        },
-      }) 
-      .populate({
-        path: "scrap_materials",
-        select: "item quantity",
-        populate: {
-          path: "item",
-          select: "name",
-        },
-      })
-      .populate({
-        path: "resources.resource_id",
-        select: "name type specification",
-      })
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(limit);
-
- 
+    .populate({
+      path: "finished_good",
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name",
+      },
+    })
+    .populate({
+      path: "raw_materials",
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name",
+      },
+    })
+    .populate({
+      path: "scrap_materials",
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name",
+      },
+    })
+    .populate({
+      path: "resources.resource_id",
+      select: "name type specification",
+    })
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
 
-    const transformedBoms = boms.map((bom) => {
-      const bomObj = bom.toObject();
-      bomObj.resources = bomObj.resources.map((res) => ({
-        name: res.resource_id?.name || '',
-        type: res.resource_id?.type || res.type,
-        specification: res.resource_id?.specification || res.specification,
-      }));
-      
-      return bomObj;
-    });
 
-    res.status(200).json({
-      status: 200,
-      success: true,
-      message: "Approved BOMs fetched successfully",
-      count: transformedBoms.length,
-      page,
-      limit,
-      boms: transformedBoms,
-    });
+
+  const transformedBoms = boms.map((bom) => {
+    const bomObj = bom.toObject();
+    bomObj.resources = bomObj.resources.map((res) => ({
+      name: res.resource_id?.name || '',
+      type: res.resource_id?.type || res.type,
+      specification: res.resource_id?.specification || res.specification,
+    }));
+
+    return bomObj;
   });
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Approved BOMs fetched successfully",
+    count: transformedBoms.length,
+    page,
+    limit,
+    boms: transformedBoms,
+  });
+});
 
 
 exports.unapproved = TryCatch(async (req, res) => {
@@ -654,190 +637,189 @@ exports.unapproved = TryCatch(async (req, res) => {
 exports.autoBom = TryCatch(async (req, res) => {
   const ObjectId = mongoose.Types.ObjectId;
 
-  const { product_id,quantity,price } = req.query;
+  const { product_id, quantity, price } = req.query;
   const QUANTITY = Number(quantity);
-  
+
   if (!product_id) {
     throw new ErrorHandler("product id is required", 400);
   }
 
 
-const result = await BOM.aggregate([
-  {
-    $lookup: {
-      from: "bom-finished-materials",
-      localField: "finished_good",
-      foreignField: "_id",
-      as: "finished_good"
+  const result = await BOM.aggregate([
+    {
+      $lookup: {
+        from: "bom-finished-materials",
+        localField: "finished_good",
+        foreignField: "_id",
+        as: "finished_good"
+      }
+    },
+    { $unwind: "$finished_good" },
+    {
+      $lookup: {
+        from: "products",
+        localField: "finished_good.item",
+        foreignField: "_id",
+        as: "finished_good.item"
+      }
+    },
+    { $unwind: "$finished_good.item" },
+    {
+      $match: {
+        "finished_good.item._id": new ObjectId(product_id)
+      }
+    },
+    {
+      $project: {
+        _id: 1
+      }
     }
-  },
-  { $unwind: "$finished_good" },
-  {
-    $lookup: {
-      from: "products",
-      localField: "finished_good.item",
-      foreignField: "_id",
-      as: "finished_good.item"
-    }
-  },
-  { $unwind: "$finished_good.item" },
-  {
-    $match: {
-      "finished_good.item._id":  new ObjectId(product_id)
-    }
-  },
-  {
-    $project: {
-      _id: 1
-    }
+  ]);
+
+
+
+  if (result.length === 0) {
+    return res.status(400).json({
+      status: 400,
+      success: false,
+      boms: "BOM does not exists"
+
+    })
   }
-]);
-
-
-
-if(result.length === 0){
- return res.status(400).json({
-    status:400,
-    success:false,
-    boms:"BOM does not exists"
-
-  })
-}
 
   const originalBomDoc = await BOM.findById(result[0]._id)
     .populate({ path: 'finished_good', populate: { path: 'item' } })
     .populate({ path: 'raw_materials', populate: { path: 'item' } })
     .populate({ path: 'scrap_materials', populate: { path: 'item' } });
-    console.log("quantity",QUANTITY)
-console.log("original wala", originalBomDoc);
-console.log("+++++++++++");
+  console.log("quantity", QUANTITY)
+  console.log("original wala", originalBomDoc);
+  console.log("+++++++++++");
 
 
 
-// Prepare new BOM object in memory (not saved to DB)
-const newFinishedGood = {
-  ...originalBomDoc.finished_good.toObject(),
-  _id: new mongoose.Types.ObjectId(),
-  quantity: QUANTITY,
-  cost: Math.round(((price || originalBomDoc?.finished_good?.item?.price) * QUANTITY) * 100) / 100 // Round to 2 decimal places
-};
-const prod = await Product.findById(newFinishedGood.item);
-newFinishedGood.item = prod;
-
-console
-const newBomDoc = {
-  ...originalBomDoc.toObject(),
-  finished_good: newFinishedGood,
-  raw_materials: undefined, // will be replaced with newRawMaterials
-  scrap_materials: undefined // will be replaced with newScrapMaterials
-};
-// Calculation reference
-const oldFinishedGoodQty = originalBomDoc.finished_good.quantity;
-const newFinishedGoodQty = QUANTITY;
-
-// Prepare new raw materials with recalculated quantity and price
-const newRawMaterials = originalBomDoc.raw_materials.map((rm) => {
-  const unitQty = rm.quantity / oldFinishedGoodQty;
-  const unitPrice = rm.quantity > 0 ? (rm.total_part_cost || 0) / rm.quantity : 0;
-  const newQty = unitQty * newFinishedGoodQty;
-  return {
-    ...rm.toObject(),
-    _id: new mongoose.Types.ObjectId(), // always generate new ID
-    quantity: Math.round(newQty * 100) / 100, // Round to 2 decimal places
-    total_part_cost: Math.round((unitPrice * newQty) * 100) / 100, // Round to 2 decimal places
-    bom: undefined // will be set after BOM is created
+  // Prepare new BOM object in memory (not saved to DB)
+  const newFinishedGood = {
+    ...originalBomDoc.finished_good.toObject(),
+    _id: new mongoose.Types.ObjectId(),
+    quantity: QUANTITY,
+    cost: Math.round(((price || originalBomDoc?.finished_good?.item?.price) * QUANTITY) * 100) / 100 // Round to 2 decimal places
   };
-});
+  const prod = await Product.findById(newFinishedGood.item);
+  newFinishedGood.item = prod;
 
-// Prepare new scrap materials with recalculated quantity and price
-const newScrapMaterials = originalBomDoc.scrap_materials.map((sc) => {
-  const unitQty = sc.quantity / oldFinishedGoodQty;
-  const unitPrice = sc.quantity > 0 ? (sc.total_part_cost || 0) / sc.quantity : 0;
-  const newQty = unitQty * newFinishedGoodQty;
-  return {
-    ...sc.toObject(),
-    _id: new mongoose.Types.ObjectId(), // always generate new ID
-    quantity: Math.round(newQty * 100) / 100, // Round to 2 decimal places
-    total_part_cost: Math.round((unitPrice * newQty) * 100) / 100, // Round to 2 decimal places
-    bom: undefined // will be set after BOM is created
+  const newBomDoc = {
+    ...originalBomDoc.toObject(),
+    finished_good: newFinishedGood,
+    raw_materials: undefined, // will be replaced with newRawMaterials
+    scrap_materials: undefined // will be replaced with newScrapMaterials
   };
-});
+  // Calculation reference
+  const oldFinishedGoodQty = originalBomDoc.finished_good.quantity;
+  const newFinishedGoodQty = QUANTITY;
+
+  // Prepare new raw materials with recalculated quantity and price
+  const newRawMaterials = originalBomDoc.raw_materials.map((rm) => {
+    const unitQty = rm.quantity / oldFinishedGoodQty;
+    const unitPrice = rm.quantity > 0 ? (rm.total_part_cost || 0) / rm.quantity : 0;
+    const newQty = unitQty * newFinishedGoodQty;
+    return {
+      ...rm.toObject(),
+      _id: new mongoose.Types.ObjectId(), // always generate new ID
+      quantity: Math.round(newQty * 100) / 100, // Round to 2 decimal places
+      total_part_cost: Math.round((unitPrice * newQty) * 100) / 100, // Round to 2 decimal places
+      bom: undefined // will be set after BOM is created
+    };
+  });
+
+  // Prepare new scrap materials with recalculated quantity and price
+  const newScrapMaterials = originalBomDoc.scrap_materials.map((sc) => {
+    const unitQty = sc.quantity / oldFinishedGoodQty;
+    const unitPrice = sc.quantity > 0 ? (sc.total_part_cost || 0) / sc.quantity : 0;
+    const newQty = unitQty * newFinishedGoodQty;
+    return {
+      ...sc.toObject(),
+      _id: new mongoose.Types.ObjectId(), // always generate new ID
+      quantity: Math.round(newQty * 100) / 100, // Round to 2 decimal places
+      total_part_cost: Math.round((unitPrice * newQty) * 100) / 100, // Round to 2 decimal places
+      bom: undefined // will be set after BOM is created
+    };
+  });
 
 
 
-// Keep original product _id for item references in newRawMaterials
-for (let i = 0; i < newRawMaterials.length; i++) {
-  // Keep the original product _id, don't create a new one
-  // newRawMaterials[i].item already contains the original ObjectId
-}
+  // Keep original product _id for item references in newRawMaterials
+  for (let i = 0; i < newRawMaterials.length; i++) {
+    // Keep the original product _id, don't create a new one
+    // newRawMaterials[i].item already contains the original ObjectId
+  }
 
-// Keep original product _id for item references in newScrapMaterials
-for (let i = 0; i < newScrapMaterials.length; i++) {
-  // Keep the original product _id, don't create a new one
-  // newScrapMaterials[i].item already contains the original ObjectId
-}
+  // Keep original product _id for item references in newScrapMaterials
+  for (let i = 0; i < newScrapMaterials.length; i++) {
+    // Keep the original product _id, don't create a new one
+    // newScrapMaterials[i].item already contains the original ObjectId
+  }
 
-console.log("raw---",newRawMaterials);
-console.log("scrap",newScrapMaterials)
+  console.log("raw---", newRawMaterials);
+  console.log("scrap", newScrapMaterials)
 
-// Keep original product _id for finished_good item
-if (newBomDoc.finished_good && newBomDoc.finished_good.item) {
-  // Keep the original product _id, don't create a new one
-  // newBomDoc.finished_good.item already contains the original ObjectId
-}
+  // Keep original product _id for finished_good item
+  if (newBomDoc.finished_good && newBomDoc.finished_good.item) {
+    // Keep the original product _id, don't create a new one
+    // newBomDoc.finished_good.item already contains the original ObjectId
+  }
 
-// First create the BOM without materials to get its _id
-const bomWithoutMaterials = {
-  ...newBomDoc,
-  raw_materials: [],
-  scrap_materials: []
+  // First create the BOM without materials to get its _id
+  const bomWithoutMaterials = {
+    ...newBomDoc,
+    raw_materials: [],
+    scrap_materials: []
 
-};
-console.log("------->>",bomWithoutMaterials)
-delete bomWithoutMaterials._id;
-console.log("**********>>",bomWithoutMaterials);
+  };
+  console.log("------->>", bomWithoutMaterials)
+  delete bomWithoutMaterials._id;
+  console.log("**********>>", bomWithoutMaterials);
 
-const savedBom = await BOM.create(bomWithoutMaterials);
-console.log("savedDom--->>>",savedBom);
-// Create BOMFinishedMaterial document (no bom field needed)
-const createdFinishedGood = await BOMFinishedMaterial.create({
-  ...newBomDoc.finished_good
-});
+  const savedBom = await BOM.create(bomWithoutMaterials);
+  console.log("savedDom--->>>", savedBom);
+  // Create BOMFinishedMaterial document (no bom field needed)
+  const createdFinishedGood = await BOMFinishedMaterial.create({
+    ...newBomDoc.finished_good
+  });
 
-// Create BOMRawMaterial documents with the BOM's _id
-const createdRawMaterials = await Promise.all(
-  newRawMaterials.map(async (rm) => {
-    const rawMaterial = await BOMRawMaterial.create({
-      ...rm,
-      bom: savedBom._id
-    });
-    return rawMaterial._id; // Return the ObjectId reference
-  })
-);
+  // Create BOMRawMaterial documents with the BOM's _id
+  const createdRawMaterials = await Promise.all(
+    newRawMaterials.map(async (rm) => {
+      const rawMaterial = await BOMRawMaterial.create({
+        ...rm,
+        bom: savedBom._id
+      });
+      return rawMaterial._id; // Return the ObjectId reference
+    })
+  );
 
-// Create BOMScrapMaterial documents with the BOM's _id
-const createdScrapMaterials = await Promise.all(
-  newScrapMaterials.map(async (sm) => {
-    const scrapMaterial = await BOMScrapMaterial.create({
-      ...sm,
-      bom: savedBom._id
-    });
-    return scrapMaterial._id; // Return the ObjectId reference
-  })
-);
-console.log("!!!!-____",createdRawMaterials);
-console.log("!!!!-____",createdScrapMaterials);
+  // Create BOMScrapMaterial documents with the BOM's _id
+  const createdScrapMaterials = await Promise.all(
+    newScrapMaterials.map(async (sm) => {
+      const scrapMaterial = await BOMScrapMaterial.create({
+        ...sm,
+        bom: savedBom._id
+      });
+      return scrapMaterial._id; // Return the ObjectId reference
+    })
+  );
+  console.log("!!!!-____", createdRawMaterials);
+  console.log("!!!!-____", createdScrapMaterials);
 
 
-// Update the saved BOM with the created material references
-savedBom.finished_good = createdFinishedGood._id;
-savedBom.raw_materials = createdRawMaterials;
-savedBom.scrap_materials = createdScrapMaterials;
-await savedBom.save();
+  // Update the saved BOM with the created material references
+  savedBom.finished_good = createdFinishedGood._id;
+  savedBom.raw_materials = createdRawMaterials;
+  savedBom.scrap_materials = createdScrapMaterials;
+  await savedBom.save();
 
-console.log('newBomDoc:', newBomDoc);
+  console.log('newBomDoc:', newBomDoc);
 
-console.log("here");
+  console.log("here");
   res.status(200).json({
     status: 200,
     success: true,
@@ -948,19 +930,19 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
       },
     });
 
- const unapprovedRawMaterials = unapprovedProducts.flatMap((prod) => {
-  const rm = prod.bom.raw_materials.find(
-    (i) => i.item._id.toString() === prod.item.toString()
-  );
+  const unapprovedRawMaterials = unapprovedProducts.flatMap((prod) => {
+    const rm = prod.bom.raw_materials.find(
+      (i) => i.item._id.toString() === prod.item.toString()
+    );
 
-  return {
-    bom_id: prod.bom._id, // required to update status
-    bom_name: prod.bom.bom_name,
-    bom_status: prod.bom.production_process_status || "raw material approval pending", // optional fallback
-    ...rm.item._doc,
-    _id: prod._id, // raw material ID
-  };
-});
+    return {
+      bom_id: prod.bom._id, // required to update status
+      bom_name: prod.bom.bom_name,
+      bom_status: prod.bom.production_process_status || "raw material approval pending", // optional fallback
+      ...rm.item._doc,
+      _id: prod._id, // raw material ID
+    };
+  });
 
 
   res.status(200).json({
@@ -1055,6 +1037,7 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
     const productionProcess = await ProductionProcess.findById(bom.production_process);
     if (!productionProcess) continue;
 
+  
     const item = rm.item;
 
     results.push({
