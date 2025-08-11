@@ -1,36 +1,17 @@
 const { object, string, date, number, array } = require("yup");
 
 exports.InvoiceValidation = object({
-  // Seller Information
-  sellerAddress: string().required("Seller address is required"),
+  // Basic Invoice Info
+  invoiceNo: string().required("Invoice number is required"),
 
   // Consignee (Ship To) Information
   consigneeShipTo: string().required("Consignee ship to is required"),
   address: string().required("Address is required"),
-  gstin: string()
-    .required("GSTIN is required")
-    .matches(
-      /^[A-Z0-9]{15}$/,
-      "GSTIN must be exactly 15 characters, only uppercase letters and numbers"
-    ),
-  pincode: string()
-    .required("Pincode is required")
-    .matches(/^[1-9][0-9]{5}$/, "Please enter a valid 6-digit pincode"),
-  state: string().required("State is required"),
+  gstin: string(),
 
   // Biller (Bill To) Information
-  billerBillTo: string().required("Biller bill to is required"),
   billerAddress: string().required("Biller address is required"),
-  billerGSTIN: string()
-    .required("Biller GSTIN is required")
-    .matches(
-      /^[A-Z0-9]{15}$/,
-      "Biller GSTIN must be exactly 15 characters, only uppercase letters and numbers"
-    ),
-  billerPincode: string()
-    .required("Biller pincode is required")
-    .matches(/^[1-9][0-9]{5}$/, "Please enter a valid 6-digit pincode"),
-  billerState: string().required("Biller state is required"),
+  billerGSTIN: string(),
 
   // Invoice Details
   deliveryNote: string(),
@@ -77,29 +58,12 @@ exports.InvoiceValidation = object({
 
 exports.InvoiceUpdateValidation = object({
   // All fields are optional for updates, but if provided should follow same rules
-  sellerAddress: string(),
+  invoiceNo: string(),
   consigneeShipTo: string(),
   address: string(),
-  gstin: string().matches(
-    /^[A-Z0-9]{15}$/,
-    "GSTIN must be exactly 15 characters, only uppercase letters and numbers"
-  ),
-  pincode: string().matches(
-    /^[1-9][0-9]{5}$/,
-    "Please enter a valid 6-digit pincode"
-  ),
-  state: string(),
-  billerBillTo: string(),
+  gstin: string(),
   billerAddress: string(),
-  billerGSTIN: string().matches(
-    /^[A-Z0-9]{15}$/,
-    "Biller GSTIN must be exactly 15 characters, only uppercase letters and numbers"
-  ),
-  billerPincode: string().matches(
-    /^[1-9][0-9]{5}$/,
-    "Please enter a valid 6-digit pincode"
-  ),
-  billerState: string(),
+  billerGSTIN: string(),
   deliveryNote: string(),
   modeTermsOfPayment: string(),
   referenceNo: string(),

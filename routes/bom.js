@@ -30,6 +30,11 @@ router.get(
   isAuthenticated,
   unapprovedRawMaterials
 );
+router.get(
+  "/all/inventory/raw-materials",
+  isAuthenticated,
+  allRawMaterialsForInventory
+);
 router.post(
   "/approve/inventory/raw-materials",
   isAuthenticated,

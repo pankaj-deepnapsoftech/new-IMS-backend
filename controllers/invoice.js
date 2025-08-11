@@ -3,17 +3,12 @@ const { TryCatch, ErrorHandler } = require("../utils/error");
 
 exports.create = TryCatch(async (req, res) => {
   const {
-    sellerAddress,
+    invoiceNo,
     consigneeShipTo,
     address,
     gstin,
-    pincode,
-    state,
-    billerBillTo,
     billerAddress,
     billerGSTIN,
-    billerPincode,
-    billerState,
     deliveryNote,
     modeTermsOfPayment,
     referenceNo,
@@ -42,17 +37,12 @@ exports.create = TryCatch(async (req, res) => {
   } = req.body;
 
   const invoiceData = {
-    sellerAddress,
+    invoiceNo,
     consigneeShipTo,
     address,
     gstin,
-    pincode,
-    state,
-    billerBillTo,
     billerAddress,
     billerGSTIN,
-    billerPincode,
-    billerState,
     deliveryNote,
     modeTermsOfPayment,
     referenceNo,

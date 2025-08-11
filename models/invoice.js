@@ -8,10 +8,10 @@ const invoiceSchema = new Schema(
       required: [true, "Creator is a required field"],
     },
 
-    // Seller Information
-    sellerAddress: {
+    // Basic Invoice Info
+    invoiceNo: {
       type: String,
-      required: [true, "Seller address is required"],
+      required: [true, "Invoice number is required"],
     },
 
     // Consignee (Ship To) Information
@@ -25,37 +25,15 @@ const invoiceSchema = new Schema(
     },
     gstin: {
       type: String,
-      required: [true, "GSTIN is required"],
-    },
-    pincode: {
-      type: String,
-      required: [true, "Pincode is required"],
-    },
-    state: {
-      type: String,
-      required: [true, "State is required"],
     },
 
     // Biller (Bill To) Information
-    billerBillTo: {
-      type: String,
-      required: [true, "Biller bill to is required"],
-    },
     billerAddress: {
       type: String,
       required: [true, "Biller address is required"],
     },
     billerGSTIN: {
       type: String,
-      required: [true, "Biller GSTIN is required"],
-    },
-    billerPincode: {
-      type: String,
-      required: [true, "Biller pincode is required"],
-    },
-    billerState: {
-      type: String,
-      required: [true, "Biller state is required"],
     },
 
     // Invoice Details
