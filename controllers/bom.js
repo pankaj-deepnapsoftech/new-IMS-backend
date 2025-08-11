@@ -5,6 +5,7 @@ const BOMRawMaterial = require("../models/bom-raw-material");
 const BOMScrapMaterial = require("../models/bom-scrap-material");
 const ProductionProcess = require("../models/productionProcess");
 const Product = require("../models/product");
+const InventoryShortage = require("../models/inventoryShortage");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 const path = require("path");
 const fs = require("fs");
@@ -48,31 +49,40 @@ exports.create = TryCatch(async (req, res) => {
   if (!isBomFinishedGoodExists) {
     throw new ErrorHandler("Finished good doesn't exist", 400);
   }
-  if (finished_good.quantity < 0) {
-    throw new ErrorHandler(`Negative quantities are not allowed`, 400);
-  }
 
+  // Check for stock and calculate shortages
+  const shortages = [];
   await Promise.all(
     raw_materials.map(async (material) => {
       const isProdExists = await Product.findById(material.item);
       if (!isProdExists) {
         throw new ErrorHandler(`Raw material doesn't exist`, 400);
       }
-      if (material.quantity < 0) {
-        throw new ErrorHandler(`Negative quantities are not allowed`, 400);
-      }
-      if (isProdExists.current_stock < material.quantity) {
+      const quantityDifference = material.quantity - (isProdExists.current_stock || 0);
+      if (quantityDifference > 0) {
         insuffientStockMsg += ` Insufficient stock of ${isProdExists.name}`;
+        shortages.push({
+          item: material.item,
+          shortage_quantity: quantityDifference,
+        });
       }
     })
   );
 
   const { item, description, quantity, image, supporting_doc, comments, cost } =
     finished_good;
+
+  // Calculate the increase in finished good quantity based on negative raw material quantities
+  const totalRawMaterialDecrease = raw_materials
+    .filter(material => material.quantity < 0)
+    .reduce((sum, material) => sum + Math.abs(material.quantity), 0);
+
+  const adjustedFinishedGoodQuantity = quantity + totalRawMaterialDecrease;
+
   const createdFinishedGood = await BOMFinishedMaterial.create({
     item,
     description,
-    quantity,
+    quantity: adjustedFinishedGoodQuantity,
     image,
     supporting_doc,
     comments,
@@ -92,7 +102,8 @@ exports.create = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-    manpower  });
+    manpower
+  });
 
   if (raw_materials) {
     const bom_raw_materials = await Promise.all(
@@ -102,6 +113,18 @@ exports.create = TryCatch(async (req, res) => {
           ...material,
           bom: bom._id,
         });
+
+        // Store shortages in InventoryShortage collection
+        const shortage = shortages.find(s => s.item.toString() === material.item.toString());
+        if (shortage) {
+          await InventoryShortage.create({
+            bom: bom._id,
+            raw_material: createdMaterial._id,
+            item: material.item,
+            shortage_quantity: shortage.shortage_quantity,
+          });
+        }
+
         return createdMaterial._id;
       })
     );
@@ -135,24 +158,26 @@ exports.create = TryCatch(async (req, res) => {
       bom,
     });
   }
+
   await Promise.all(
     raw_materials.map(async (material) => {
       const product = await Product.findById(material.item);
       if (product) {
         product.current_stock =
           (product.current_stock || 0) - material.quantity;
-        product.change_type = "decrease";
-        product.quantity_changed = material.quantity;
+        product.change_type = material.quantity >= 0 ? "decrease" : "increase";
+        product.quantity_changed = Math.abs(material.quantity);
         await product.save();
       }
     })
   );
+
   const finishedProduct = await Product.findById(finished_good.item);
   if (finishedProduct) {
     finishedProduct.current_stock =
-      (finishedProduct.current_stock || 0) + finished_good.quantity;
-    finishedProduct.change_type = "increase";
-    finishedProduct.quantity_changed = finished_good.quantity;
+      (finishedProduct.current_stock || 0) + adjustedFinishedGoodQuantity;
+    finishedProduct.change_type = adjustedFinishedGoodQuantity >= 0 ? "increase" : "decrease";
+    finishedProduct.quantity_changed = Math.abs(adjustedFinishedGoodQuantity);
     await finishedProduct.save();
   }
 
@@ -163,6 +188,7 @@ exports.create = TryCatch(async (req, res) => {
     bom,
   });
 });
+
 exports.update = TryCatch(async (req, res) => {
   const { id } = req.params;
   const {
@@ -213,13 +239,12 @@ exports.update = TryCatch(async (req, res) => {
   }
 
   let insuffientStockMsg = "";
+  const shortages = [];
 
   if (finished_good) {
     const isBomFinishedGoodExists = await Product.findById(finished_good.item);
-    if (isBomFinishedGoodExists) {
-      if (finished_good.quantity < 0) {
-        throw new ErrorHandler(`Negative quantities are not allowed`, 400);
-      }
+    if (!isBomFinishedGoodExists) {
+      throw new ErrorHandler("Finished good doesn't exist", 400);
     }
   }
 
@@ -232,11 +257,14 @@ exports.update = TryCatch(async (req, res) => {
           if (!isProdExists) {
             throw new ErrorHandler(`Product doesn't exist`, 400);
           }
-          if (material.quantity < 0) {
-            throw new ErrorHandler(`Negative quantities are not allowed`, 400);
-          }
-          if (isProdExists.current_stock < material.quantity) {
+          const quantityDifference = material.quantity - (isProdExists.current_stock || 0);
+          if (quantityDifference > 0) {
             insuffientStockMsg += ` Insufficient stock of ${isProdExists.name}`;
+            shortages.push({
+              item: material.item,
+              raw_material_id: material._id,
+              shortage_quantity: quantityDifference,
+            });
           }
         }
       })
@@ -265,14 +293,16 @@ exports.update = TryCatch(async (req, res) => {
       bom.finished_good.item = finished_good.item;
     }
 
-    const quantityDifference =
-      finished_good.quantity - bom.finished_good.quantity;
+    // Calculate the increase in finished good quantity based on negative raw material quantities
+    const totalRawMaterialDecrease = raw_materials
+      ? raw_materials
+          .filter(material => material.quantity < 0)
+          .reduce((sum, material) => sum + Math.abs(material.quantity), 0)
+      : 0;
 
-    if (bom.finished_good.quantity > finished_good.quantity) {
-      bom.finished_good.quantity = finished_good.quantity;
-    } else if (bom.finished_good.quantity < finished_good.quantity) {
-      bom.finished_good.quantity = finished_good.quantity;
-    }
+    const adjustedFinishedGoodQuantity = finished_good.quantity + totalRawMaterialDecrease;
+
+    bom.finished_good.quantity = adjustedFinishedGoodQuantity;
 
     await isProdExists.save();
 
@@ -301,32 +331,42 @@ exports.update = TryCatch(async (req, res) => {
             }
 
             isExistingRawMaterial.description = material?.description;
-
-            if (
-              isExistingRawMaterial.quantity.toString() !==
-              material?.quantity?.toString()
-            ) {
-              const quantityDifference =
-                material.quantity - isExistingRawMaterial.quantity;
-              if (quantityDifference > 0) {
-                isExistingRawMaterial.quantity = material.quantity;
-              } else {
-                isExistingRawMaterial.quantity = material.quantity;
-              }
-            }
-
+            isExistingRawMaterial.quantity = material.quantity;
             isExistingRawMaterial.assembly_phase = material?.assembly_phase;
             isExistingRawMaterial.supporting_doc = material?.supporting_doc;
             isExistingRawMaterial.comments = material?.comments;
             isExistingRawMaterial.total_part_cost = material?.total_part_cost;
 
             await isExistingRawMaterial.save();
+
+            // Update or create shortage record
+            const shortage = shortages.find(s => s.item.toString() === material.item.toString());
+            if (shortage) {
+              await InventoryShortage.findOneAndUpdate(
+                { bom: bom._id, raw_material: material._id },
+                { shortage_quantity: shortage.shortage_quantity },
+                { upsert: true, new: true }
+              );
+            } else {
+              await InventoryShortage.deleteOne({ bom: bom._id, raw_material: material._id });
+            }
           } else {
             const newRawMaterial = await BOMRawMaterial.create({
               ...material,
               bom: bom._id,
             });
             bom.raw_materials.push(newRawMaterial._id);
+
+            // Store new shortage if applicable
+            const shortage = shortages.find(s => s.item.toString() === material.item.toString());
+            if (shortage) {
+              await InventoryShortage.create({
+                bom: bom._id,
+                raw_material: newRawMaterial._id,
+                item: material.item,
+                shortage_quantity: shortage.shortage_quantity,
+              });
+            }
           }
         } catch (error) {
           console.error(
@@ -357,32 +397,7 @@ exports.update = TryCatch(async (req, res) => {
             }
 
             isExistingScrapMaterial.description = material?.description;
-
-            if (
-              isExistingScrapMaterial.quantity.toString() !==
-              material?.quantity?.toString()
-            ) {
-              const quantityDifference =
-                material.quantity - isExistingScrapMaterial.quantity;
-              if (quantityDifference > 0) {
-                isExistingScrapMaterial.quantity = material.quantity;
-              } else {
-                isExistingScrapMaterial.quantity = material.quantity;
-              }
-            }
-            if (
-              isExistingScrapMaterial.quantity.toString() !==
-              material?.quantity?.toString()
-            ) {
-              const quantityDifference =
-                material.quantity - isExistingScrapMaterial.quantity;
-              if (quantityDifference > 0) {
-                isExistingScrapMaterial.quantity = material.quantity;
-              } else {
-                isExistingScrapMaterial.quantity = material.quantity;
-              }
-            }
-
+            isExistingScrapMaterial.quantity = material.quantity;
             isExistingScrapMaterial.total_part_cost = material?.total_part_cost;
 
             await isExistingScrapMaterial.save();
@@ -410,7 +425,6 @@ exports.update = TryCatch(async (req, res) => {
     bom.remarks = remarks.trim();
   }
   if (Array.isArray(manpower)) {
-    // Validate each manpower entry has a user
     const validManpower = manpower.filter(mp => mp.user);
     bom.manpower = validManpower;
   }
@@ -418,7 +432,6 @@ exports.update = TryCatch(async (req, res) => {
     const validResources = resources.filter(res => res.resource_id);
     bom.resources = validResources;
   }
-
 
   bom_name && bom_name.trim().length > 0 && (bom.bom_name = bom_name);
   parts_count && parts_count > 0 && (bom.parts_count = parts_count);
@@ -431,7 +444,6 @@ exports.update = TryCatch(async (req, res) => {
   await bom.finished_good.save();
   await bom.save();
 
-  // Update the quantity of the finished good, raw materials and scrap materials in the production process, if the production process exists
   if (bom.production_process) {
     const productionProcess = await ProductionProcess.findById(
       bom.production_process
@@ -458,14 +470,20 @@ exports.update = TryCatch(async (req, res) => {
       });
 
     productionProcess.raw_materials.forEach((rm) => {
-      rm.estimated_quantity = bom.raw_materials.find(
+      const matchingMaterial = bom.raw_materials.find(
         (m) => m.item._id.toString() === rm.item._id.toString()
-      ).quantity;
+      );
+      if (matchingMaterial) {
+        rm.estimated_quantity = matchingMaterial.quantity;
+      }
     });
     productionProcess.scrap_materials.forEach((sc) => {
-      sc.estimated_quantity = bom.scrap_materials.find(
+      const matchingMaterial = bom.scrap_materials.find(
         (m) => m.item._id.toString() === sc.item._id.toString()
-      ).quantity;
+      );
+      if (matchingMaterial) {
+        sc.estimated_quantity = matchingMaterial.quantity;
+      }
     });
 
     productionProcess.finished_good.estimated_quantity =
@@ -488,6 +506,7 @@ exports.update = TryCatch(async (req, res) => {
     message: "BOM has been updated successfully",
   });
 });
+
 exports.remove = TryCatch(async (req, res) => {
   const { id } = req.params;
   if (!id) {
@@ -503,6 +522,7 @@ exports.remove = TryCatch(async (req, res) => {
 
   await BOMRawMaterial.deleteMany({ _id: { $in: rawMaterials } });
   await BOMFinishedMaterial.deleteOne({ _id: finishedGood });
+  await InventoryShortage.deleteMany({ bom: id });
 
   await bom.deleteOne();
   res.status(200).json({
@@ -512,6 +532,7 @@ exports.remove = TryCatch(async (req, res) => {
     bom,
   });
 });
+
 exports.details = TryCatch(async (req, res) => {
   const { id } = req.params;
   if (!id) {
@@ -549,74 +570,70 @@ exports.details = TryCatch(async (req, res) => {
     bom,
   });
 });
-  exports.all = TryCatch(async (req, res) => {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 100;
-    const skip = (page - 1) * limit;
 
-    const boms = await BOM.find({ approved: true })
-      .populate({
-        path: "manpower.user",
-        select: "first_name last_name email phone employeeId role",
-      })
+exports.all = TryCatch(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 100;
+  const skip = (page - 1) * limit;
 
-      .populate({
-        path: "finished_good",
-        select: "item quantity",
-        populate: {
-          path: "item",
-          select: "name",
-        },
-      })
-      .populate({
-        path: "raw_materials",
-        select: "item quantity",
-        populate: {
-          path: "item",
-          select: "name",
-        },
-      }) 
-      .populate({
-        path: "scrap_materials",
-        select: "item quantity",
-        populate: {
-          path: "item",
-          select: "name",
-        },
-      })
-      .populate({
-        path: "resources.resource_id",
-        select: "name type specification",
-      })
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(limit);
+  const boms = await BOM.find({ approved: true })
+    .populate({
+      path: "manpower.user",
+      select: "first_name last_name email phone employeeId role",
+    })
+    .populate({
+      path: "finished_good",
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name",
+      },
+    })
+    .populate({
+      path: "raw_materials",
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name",
+      },
+    }) 
+    .populate({
+      path: "scrap_materials",
+      select: "item quantity",
+      populate: {
+        path: "item",
+        select: "name",
+      },
+    })
+    .populate({
+      path: "resources.resource_id",
+      select: "name type specification",
+    })
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
- 
-
-
-    const transformedBoms = boms.map((bom) => {
-      const bomObj = bom.toObject();
-      bomObj.resources = bomObj.resources.map((res) => ({
-        name: res.resource_id?.name || '',
-        type: res.resource_id?.type || res.type,
-        specification: res.resource_id?.specification || res.specification,
-      }));
-      
-      return bomObj;
-    });
-
-    res.status(200).json({
-      status: 200,
-      success: true,
-      message: "Approved BOMs fetched successfully",
-      count: transformedBoms.length,
-      page,
-      limit,
-      boms: transformedBoms,
-    });
+  const transformedBoms = boms.map((bom) => {
+    const bomObj = bom.toObject();
+    bomObj.resources = bomObj.resources.map((res) => ({
+      name: res.resource_id?.name || '',
+      type: res.resource_id?.type || res.type,
+      specification: res.resource_id?.specification || res.specification,
+    }));
+    
+    return bomObj;
   });
 
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Approved BOMs fetched successfully",
+    count: transformedBoms.length,
+    page,
+    limit,
+    boms: transformedBoms,
+  });
+});
 
 exports.unapproved = TryCatch(async (req, res) => {
   const boms = await BOM.find({ approved: false })
@@ -649,367 +666,67 @@ exports.unapproved = TryCatch(async (req, res) => {
 exports.autoBom = TryCatch(async (req, res) => {
   const ObjectId = mongoose.Types.ObjectId;
 
-  const { product_id,quantity } = req.query;
+  const { product_id, quantity } = req.query;
   
   if (!product_id) {
     throw new ErrorHandler("product id is required", 400);
   }
 
-// Mongo Query to find full BOM detail against product_name
-// const boms = await BOM.aggregate([
-
-//   // Finished Good lookup (unchanged)
-//   {
-//     $lookup: {
-//       from: "bom-finished-materials",
-//       localField: "finished_good",
-//       foreignField: "_id",
-//       as: "finished_good"
-//     }
-//   },
-//   { $unwind: "$finished_good" },
-//   {
-//     $lookup: {
-//       from: "products",
-//       localField: "finished_good.item",
-//       foreignField: "_id",
-//       as: "finished_good.item"
-//     }
-//   },
-//   { $unwind: "$finished_good.item" },
-
-//   // Raw Materials lookup (unchanged)
-//   { $unwind: { path: "$raw_materials", preserveNullAndEmptyArrays: true } },
-//   {
-//     $lookup: {
-//       from: "bom-raw-materials",
-//       localField: "raw_materials",
-//       foreignField: "_id",
-//       as: "raw_materials.item"
-//     }
-//   },
-//   { $unwind: { path: "$raw_materials.item", preserveNullAndEmptyArrays: true } },
-
-//   // NEW: Populate raw_materials.item.item (product document)
-//   {
-//     $lookup: {
-//       from: "products",
-//       localField: "raw_materials.item.item",
-//       foreignField: "_id",
-//       as: "raw_materials.item.item"
-//     }
-//   },
-//   { $unwind: { path: "$raw_materials.item.item", preserveNullAndEmptyArrays: true } },
-
-//   {
-//     $group: {
-//       _id: "$_id",
-//       doc: { $first: "$$ROOT" },
-//       raw_materials: { $push: "$raw_materials" }
-//     }
-//   },
-//   {
-//     $addFields: {
-//       "doc.raw_materials": {
-//         $cond: [
-//           { $eq: [{ $arrayElemAt: ["$raw_materials", 0] }, null] },
-//           [],
-//           "$raw_materials"
-//         ]
-//       }
-//     }
-//   },
-//   { $replaceRoot: { newRoot: "$doc" } },
-
-//   // Scrap Materials lookup (unchanged)
-//   { $unwind: { path: "$scrap_materials", preserveNullAndEmptyArrays: true } },
-//   {
-//     $lookup: {
-//       from: "bom-scrap-materials",
-//       localField: "scrap_materials",
-//       foreignField: "_id",
-//       as: "scrap_materials.item"
-//     }
-//   },
-//   { $unwind: { path: "$scrap_materials.item", preserveNullAndEmptyArrays: true } },
-
-//   // NEW: Populate scrap_materials.item.item (product document)
-//   {
-//     $lookup: {
-//       from: "products",
-//       localField: "scrap_materials.item.item",
-//       foreignField: "_id",
-//       as: "scrap_materials.item.item"
-//     }
-//   },
-//   { $unwind: { path: "$scrap_materials.item.item", preserveNullAndEmptyArrays: true } },
-
-//   {
-//     $group: {
-//       _id: "$_id",
-//       doc: { $first: "$$ROOT" },
-//       scrap_materials: { $push: "$scrap_materials" }
-//     }
-//   },
-//   {
-//     $addFields: {
-//       "doc.scrap_materials": {
-//         $cond: [
-//           { $eq: [{ $arrayElemAt: ["$scrap_materials", 0] }, null] },
-//           [],
-//           "$scrap_materials"
-//         ]
-//       }
-//     }
-//   },
-//   { $replaceRoot: { newRoot: "$doc" } }
-
-// ]);
-
-
-// Mongo Query to find full BOM detail against product_name
-// const boms = await BOM.aggregate([
-
-//   // Finished Good lookup (unchanged)
-//   {
-//     $lookup: {
-//       from: "bom-finished-materials",
-//       localField: "finished_good",
-//       foreignField: "_id",
-//       as: "finished_good"
-//     }
-//   },
-//   { $unwind: "$finished_good" },
-//   {
-//     $lookup: {
-//       from: "products",
-//       localField: "finished_good.item",
-//       foreignField: "_id",
-//       as: "finished_good.item"
-//     }
-//   },
-//   { $unwind: "$finished_good.item" },
-//   {
-//     $match: {
-//       "finished_good.item.name": product_name
-//     }
-//   },
-
-//   // // Raw Materials lookup (unchanged)
-//   { $unwind: { path: "$raw_materials", preserveNullAndEmptyArrays: true } },
-//   {
-//     $lookup: {
-//       from: "bom-raw-materials",
-//       localField: "raw_materials",
-//       foreignField: "_id",
-//       as: "raw_materials.item"
-//     }
-//   },
-//   { $unwind: { path: "$raw_materials.item", preserveNullAndEmptyArrays: true } },
-
-//   // // NEW: Populate raw_materials.item.item (product document)
-//   {
-//     $lookup: {
-//       from: "products",
-//       localField: "raw_materials.item.item",
-//       foreignField: "_id",
-//       as: "raw_materials.item.item"
-//     }
-//   },
-//   { $unwind: { path: "$raw_materials.item.item", preserveNullAndEmptyArrays: true } },
-
-//   {
-//     $group: {
-//       _id: "$_id",
-//       doc: { $first: "$$ROOT" },
-//       raw_materials: { $push: "$raw_materials" }
-//     }
-//   },
-//   {
-//     $addFields: {
-//       "doc.raw_materials": {
-//         $cond: [
-//           { $eq: [{ $arrayElemAt: ["$raw_materials", 0] }, null] },
-//           [],
-//           "$raw_materials"
-//         ]
-//       }
-//     }
-//   },
-//   { $replaceRoot: { newRoot: "$doc" } },
-
-//   // Scrap Materials lookup (unchanged)
-//   { $unwind: { path: "$scrap_materials", preserveNullAndEmptyArrays: true } },
-//   {
-//     $lookup: {
-//       from: "bom-scrap-materials",
-//       localField: "scrap_materials",
-//       foreignField: "_id",
-//       as: "scrap_materials.item"
-//     }
-//   },
-//   { $unwind: { path: "$scrap_materials.item", preserveNullAndEmptyArrays: true } },
-
-//   // NEW: Populate scrap_materials.item.item (product document)
-//   {
-//     $lookup: {
-//       from: "products",
-//       localField: "scrap_materials.item.item",
-//       foreignField: "_id",
-//       as: "scrap_materials.item.item"
-//     }
-//   },
-//   { $unwind: { path: "$scrap_materials.item.item", preserveNullAndEmptyArrays: true } },
-
-//   {
-//     $group: {
-//       _id: "$_id",
-//       doc: { $first: "$$ROOT" },
-//       scrap_materials: { $push: "$scrap_materials" }
-//     }
-//   },
-//   {
-//     $addFields: {
-//       "doc.scrap_materials": {
-//         $cond: [
-//           { $eq: [{ $arrayElemAt: ["$scrap_materials", 0] }, null] },
-//           [],
-//           "$scrap_materials"
-//         ]
-//       }
-//     }
-//   },
-//   { $replaceRoot: { newRoot: "$doc" } }
-
-// ]);
-
-
-// Mongo query to find BOM _id against product name
-// const result = await BOM.aggregate([
-//   // Step 1: Lookup finished_good doc
-//   {
-//     $lookup: {
-//       from: "bom-finished-materials",
-//       localField: "finished_good",
-//       foreignField: "_id",
-//       as: "finished_good"
-//     }
-//   },
-//   { $unwind: "$finished_good" },
-//   // Step 2: Lookup product from finished_good.item
-//   {
-//     $lookup: {
-//       from: "products",
-//       localField: "finished_good.item",
-//       foreignField: "_id",
-//       as: "finished_good.item"
-//     }
-//   },
-//   { $unwind: "$finished_good.item" },
-//   // Step 3: Match product name
-//   {
-//     $match: {
-//       "finished_good.item.name": product_name
-//     }
-//   },
-//   // Step 4: Project only BOM _id
-//   { $unwind: "$finished_good.item.name" },
-//   {
-//     $project: {
-//       _id: 1
-//     }
-//   },
-  
-// ]);
-
-
-const result = await BOM.aggregate([
-  {
-    $lookup: {
-      from: "bom-finished-materials",
-      localField: "finished_good",
-      foreignField: "_id",
-      as: "finished_good"
+  const result = await BOM.aggregate([
+    {
+      $lookup: {
+        from: "bom-finished-materials",
+        localField: "finished_good",
+        foreignField: "_id",
+        as: "finished_good"
+      }
+    },
+    { $unwind: "$finished_good" },
+    {
+      $lookup: {
+        from: "products",
+        localField: "finished_good.item",
+        foreignField: "_id",
+        as: "finished_good.item"
+      }
+    },
+    { $unwind: "$finished_good.item" },
+    {
+      $match: {
+        "finished_good.item._id": new ObjectId(product_id)
+      }
+    },
+    {
+      $project: {
+        _id: 1
+      }
     }
-  },
-  { $unwind: "$finished_good" },
-  {
-    $lookup: {
-      from: "products",
-      localField: "finished_good.item",
-      foreignField: "_id",
-      as: "finished_good.item"
-    }
-  },
-  { $unwind: "$finished_good.item" },
-  {
-    $match: {
-      "finished_good.item._id":  new ObjectId(product_id)
-    }
-  },
-  {
-    $project: {
-      _id: 1
-    }
+  ]);
+
+  if (result.length === 0) {
+    return res.status(400).json({
+      status: 400,
+      success: false,
+      boms: "BOM does not exist"
+    });
   }
-]);
-
-
-if(result.length === 0){
- return res.status(400).json({
-    status:400,
-    success:false,
-    boms:"BOM does not exists"
-
-  })
-}
-// const bomDoc = await BOM.findById(result[0]).populate('finished_good');
-// const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
-
-// bomDoc.finished_good.quantity = Number(quantity);
-// bomDoc.finished_good = bomDoc.finished_good._id;
-// const finalBom = await BOM.create(bomDoc);
-// await finalBom.save();
- // Fetch original BOM document with populate
-
-  // const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
-
-  // // Modify quantity in populated finished_good
-  // bomDoc.finished_good.quantity = Number(quantity);
-
-  // // Convert populated finished_good back to ObjectId for saving in BOM doc
-  // bomDoc.finished_good = bomDoc.finished_good._id;
-
-  // // Create a plain object copy without _id (so that new document can be created)
-  // const newBomData = bomDoc.toObject();
-  // delete newBomData._id; 
-
-  // // Create new BOM document with updated data
-  // const finalBom = await BOM.create(newBomData);
 
   const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
 
-  // Make a new copy of finished_good
   const finishedGoodDoc = bomDoc.finished_good.toObject();
-  delete finishedGoodDoc._id; // Remove old _id to let MongoDB create a new one
+  delete finishedGoodDoc._id;
 
-  // Update the quantity
   finishedGoodDoc.quantity = Number(quantity);
 
-  // Save new finished_good document
   const newFinishedGood = await BOMFinishedMaterial.create(finishedGoodDoc);
 
-  // Now prepare BOM
   const newBomData = bomDoc.toObject();
-  delete newBomData._id; // Remove old BOM _id
+  delete newBomData._id;
 
-  // Replace with new finished_good reference
   newBomData.finished_good = newFinishedGood._id;
 
-  // Create new BOM
   const finalBom = await BOM.create(newBomData);
 
-console.log("here");
   res.status(200).json({
     status: 200,
     success: true,
@@ -1035,7 +752,6 @@ exports.findFinishedGoodBom = TryCatch(async (req, res) => {
   });
 });
 
-// Super Admin
 exports.unapprovedRawMaterialsForAdmin = TryCatch(async (req, res) => {
   const unapprovedProducts = await BOMRawMaterial.find({
     approvedByAdmin: false,
@@ -1072,7 +788,6 @@ exports.unapprovedRawMaterialsForAdmin = TryCatch(async (req, res) => {
   });
 });
 
-// Super Admin
 exports.approveRawMaterialForAdmin = TryCatch(async (req, res) => {
   if (!req.user.isSuper) {
     throw new ErrorHandler(
@@ -1098,7 +813,6 @@ exports.approveRawMaterialForAdmin = TryCatch(async (req, res) => {
   });
 });
 
-// Inventory Personnel
 exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
   const unapprovedProducts = await BOMRawMaterial.find({
     approvedByInventoryPersonnel: false,
@@ -1135,10 +849,8 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
   });
 });
 
-// Inventory Personnel
 exports.approveRawMaterial = TryCatch(async (req, res) => {
   const { _id } = req.body;
-  // console.log("Raw material id:", _id);
   if (!_id) {
     throw new ErrorHandler("Raw material id not provided", 400);
   }
@@ -1170,7 +882,6 @@ exports.approveRawMaterial = TryCatch(async (req, res) => {
   });
 });
 
-// GET /api/bom/weekly
 exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
   const allBoms = await BOM.find({ approved: true }).select(
     "bom_name createdAt"
@@ -1199,110 +910,41 @@ exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
   });
 });
 
+exports.getInventoryShortages = TryCatch(async (req, res) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 100;
+  const skip = (page - 1) * limit;
 
+  const shortages = await InventoryShortage.find()
+    .populate({
+      path: "item",
+      select: "name current_stock price",
+    })
+    .populate({
+      path: "bom",
+      select: "bom_name",
+    })
+    .sort({ updatedAt: -1 })
+    .skip(skip)
+    .limit(limit);
 
+  const formattedShortages = shortages.map(shortage => ({
+    bom_name: shortage.bom?.bom_name || 'Unknown BOM',
+    item_name: shortage.item?.name || 'Unknown Item',
+    item: shortage.item?._id || null,
+    shortage_quantity: shortage.shortage_quantity,
+    current_stock: shortage.item?.current_stock || 0,
+    current_price: shortage.item?.price || 0,
+    updated_at: shortage.updatedAt,
+  }));
 
-// exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
-//   const ext = path.extname(req.file.originalname).toLowerCase();
-//   let parsedData = [];
-
-//   if (!req.file) {
-//     throw new ErrorHandler("No file uploaded", 400);
-//   }
-
-//   try {
-//     if (ext === ".csv") {
-//       parsedData = await csv().fromFile(req.file.path);
-//     } else if (ext === ".xlsx") {
-//       parsedData = parseExcelFile(req.file.path);
-//     } else {
-//       throw new ErrorHandler("Unsupported file type. Please upload .csv or .xlsx", 400);
-//     }
-
-//     fs.unlink(req.file.path, () => { }); // Remove uploaded file
-
-//     if (!Array.isArray(parsedData) || parsedData.length === 0) {
-//       throw new ErrorHandler("No valid data found in uploaded file", 400);
-//     }
-
-//     const createdBOMs = [];
-
-//     for (const bomData of parsedData) {
-//       const {
-//         bom_name,
-//         parts_count,
-//         total_cost,
-//         raw_materials,
-//         finished_good,
-//         processes,
-//         other_charges,
-//         remarks,
-//       } = bomData;
-
-//       let parsedRawMaterials = [];
-//       let parsedFinishedGood = {};
-
-//       try {
-//         parsedRawMaterials = JSON.parse(raw_materials);
-//         if (!Array.isArray(parsedRawMaterials)) throw new Error();
-//       } catch (err) {
-//         throw new ErrorHandler(`Invalid JSON format for raw_materials in BOM: ${bom_name}`, 400);
-//       }
-
-//       try {
-//         parsedFinishedGood = JSON.parse(finished_good);
-//       } catch (err) {
-//         throw new ErrorHandler(`Invalid JSON format for finished_good in BOM: ${bom_name}`, 400);
-//       }
-
-//       const createdFinishedGood = await BOMFinishedMaterial.create({
-//         item: parsedFinishedGood.item,
-//         description: parsedFinishedGood.description,
-//         quantity: parsedFinishedGood.quantity,
-//         image: parsedFinishedGood.image,
-//         supporting_doc: parsedFinishedGood.supporting_doc,
-//         comments: parsedFinishedGood.comments,
-//         cost: parsedFinishedGood.cost,
-//       });
-
-//       const bom = await BOM.create({
-//         bom_name,
-//         parts_count,
-//         total_cost,
-//         processes,
-//         other_charges,
-//         remarks,
-//         approved_by: req.user._id,
-//         approval_date: new Date(),
-//         approved: req.user.isSuper,
-//         creator: req.user._id,
-//         finished_good: createdFinishedGood._id,
-//       });
-
-//       const bom_raw_materials = await Promise.all(
-//         parsedRawMaterials.map(async (material) => {
-//           const createdMaterial = await BOMRawMaterial.create({
-//             ...material,
-//             bom: bom._id,
-//           });
-//           return createdMaterial._id;
-//         })
-//       );
-
-//       bom.raw_materials = bom_raw_materials;
-//       await bom.save();
-//       createdBOMs.push(bom);
-//     }
-
-//     res.status(200).json({
-//       success: true,
-//       message: "Bulk BOM upload successful",
-//       boms: createdBOMs,
-//     });
-//   } catch (error) {
-//     res.status(400).json({
-//       success: false,
-//       message: error.message || "Bulk BOM upload failed",
-//     });
-//   }
-// });
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Inventory shortages fetched successfully",
+    count: formattedShortages.length,
+    page,
+    limit,
+    shortages: formattedShortages,
+  });
+});

@@ -14,11 +14,13 @@ const {
   exportToExcelIndirect,
   downloadSampleTemplateIndirect,
   rawMaterials,
+  updateInventory,
 } = require("../controllers/product");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 const { isSuper } = require("../middlewares/isSuper");
 const { isAllowed } = require("../middlewares/isAllowed");
 const { upload } = require("../utils/upload");
+const { roundAllPrices } = require("../utils/roundPrices");
 const router = express.Router();
 
 // CRUD operations
@@ -43,6 +45,28 @@ router.post(
   upload.single("excel"),
   bulkUploadHandlerIndirect
 );
+
+// Inventory update
+router.post("/update-inventory", isAuthenticated, isAllowed, updateInventory);
+
+// Utility route to round all existing prices to whole numbers
+router.post("/round-prices", isAuthenticated, isSuper, async (req, res) => {
+  try {
+    await roundAllPrices();
+    res.status(200).json({
+      status: 200,
+      success: true,
+      message: "All prices have been rounded to whole numbers successfully"
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 500,
+      success: false,
+      message: "Failed to round prices",
+      error: error.message
+    });
+  }
+});
 
 // Export operations - Updated for direct products 
 

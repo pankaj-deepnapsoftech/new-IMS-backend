@@ -872,3 +872,49 @@ exports.downloadSampleTemplateIndirect = TryCatch(async (req, res) => {
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   res.send(buffer);
 });
+
+exports.updateInventory = TryCatch(async (req, res) => {
+  const { itemId, buyQuantity, newPrice } = req.body;
+
+  if (!itemId || !buyQuantity || !newPrice) {
+    throw new ErrorHandler("Please provide itemId, buyQuantity, and newPrice", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(itemId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  // Calculate new stock and average price
+  const currentStock = product.current_stock || 0;
+  const currentPrice = product.price || 0;
+  
+  const totalValue = (currentStock * currentPrice) + (buyQuantity * newPrice);
+  const newTotalStock = currentStock + buyQuantity;
+  const newAveragePrice = newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : newPrice;
+
+  // Update the product
+  const updatedProduct = await Product.findByIdAndUpdate(
+    itemId,
+    {
+      current_stock: newTotalStock,
+      price: newAveragePrice,
+      change_type: "increase",
+      quantity_changed: buyQuantity,
+      regular_buying_price: newPrice, // Update regular buying price
+    },
+    { new: true }
+  );
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Inventory updated successfully",
+    product: updatedProduct,
+    priceDifference: Math.round(newPrice - currentPrice),
+    newAveragePrice: newAveragePrice,
+    previousStock: currentStock,
+    newStock: newTotalStock
+  });
+});

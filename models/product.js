@@ -95,5 +95,76 @@ const productSchema = new Schema(
   }
 );
 
+// Pre-save middleware to ensure all prices are whole numbers
+productSchema.pre('save', function(next) {
+  if (this.price !== undefined) {
+    this.price = Math.round(this.price);
+  }
+  if (this.regular_buying_price !== undefined) {
+    this.regular_buying_price = Math.round(this.regular_buying_price);
+  }
+  if (this.wholesale_buying_price !== undefined) {
+    this.wholesale_buying_price = Math.round(this.wholesale_buying_price);
+  }
+  if (this.mrp !== undefined) {
+    this.mrp = Math.round(this.mrp);
+  }
+  if (this.dealer_price !== undefined) {
+    this.dealer_price = Math.round(this.dealer_price);
+  }
+  if (this.distributor_price !== undefined) {
+    this.distributor_price = Math.round(this.distributor_price);
+  }
+  next();
+});
+
+// Pre-update middleware to ensure all prices are whole numbers
+productSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate();
+  if (update.price !== undefined) {
+    update.price = Math.round(update.price);
+  }
+  if (update.regular_buying_price !== undefined) {
+    update.regular_buying_price = Math.round(update.regular_buying_price);
+  }
+  if (update.wholesale_buying_price !== undefined) {
+    update.wholesale_buying_price = Math.round(update.wholesale_buying_price);
+  }
+  if (update.mrp !== undefined) {
+    update.mrp = Math.round(update.mrp);
+  }
+  if (update.dealer_price !== undefined) {
+    update.dealer_price = Math.round(update.dealer_price);
+  }
+  if (update.distributor_price !== undefined) {
+    update.distributor_price = Math.round(update.distributor_price);
+  }
+  next();
+});
+
+// Pre-update middleware for findByIdAndUpdate
+productSchema.pre('findByIdAndUpdate', function(next) {
+  const update = this.getUpdate();
+  if (update.price !== undefined) {
+    update.price = Math.round(update.price);
+  }
+  if (update.regular_buying_price !== undefined) {
+    update.regular_buying_price = Math.round(update.regular_buying_price);
+  }
+  if (update.wholesale_buying_price !== undefined) {
+    update.wholesale_buying_price = Math.round(update.wholesale_buying_price);
+  }
+  if (update.mrp !== undefined) {
+    update.mrp = Math.round(update.mrp);
+  }
+  if (update.dealer_price !== undefined) {
+    update.dealer_price = Math.round(update.dealer_price);
+  }
+  if (update.distributor_price !== undefined) {
+    update.distributor_price = Math.round(update.distributor_price);
+  }
+  next();
+});
+
 const Product = model("Product", productSchema);
 module.exports = Product;
