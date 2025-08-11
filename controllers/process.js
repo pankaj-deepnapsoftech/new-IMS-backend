@@ -4,6 +4,7 @@ const BOMRawMaterial = require("../models/bom-raw-material");
 const BOMScrapMaterial = require("../models/bom-scrap-material");
 const Product = require("../models/product");
 const { TryCatch, ErrorHandler } = require("../utils/error");
+const BOMFinishedMaterial = require("../models/bom-finished-material");
 
 exports.create = TryCatch(async (req, res) => {
   const processData = req.body;
@@ -66,7 +67,7 @@ exports.create = TryCatch(async (req, res) => {
   });
 
   bom.production_process = productionProcess._id;
-  bom.is_production_started = true;
+  // bom.is_production_started = true;
   await bom.save();
 
   res.status(200).json({
@@ -312,7 +313,7 @@ exports.all = TryCatch(async (req, res) => {
   const productionProcesses = await ProductionProcess.find().populate(
     "rm_store fg_store scrap_store creator item bom"
   );
-// console.log("prodcution proce", productionProcesses);
+  // console.log("prodcution proce", productionProcesses);
   res.status(200).json({
     status: 200,
     success: true,
@@ -327,15 +328,15 @@ exports.requestForAllocation = TryCatch(async (req, res) => {
   if (!_id) {
     throw new ErrorHandler("ID not provided", 400);
   }
-console.log("Request for allocation for process ID:", _id);
+  console.log("Request for allocation for process ID:", _id);
   const process = await ProductionProcess.findById(_id);
   if (!process) {
     throw new ErrorHandler("Production process not found", 404);
   }
-// console.log("Current process status:", process);
+  // console.log("Current process status:", process);
   process.status = "request for allow inventory";
   await process.save();
-// console.log("Updated process status:", process);
+  // console.log("Updated process status:", process);
   res.status(200).json({
     success: true,
     message: "Status updated to 'Request for allocation'",
@@ -366,7 +367,6 @@ exports.markInventoryInTransit = TryCatch(async (req, res) => {
 exports.startProduction = async (req, res) => {
   try {
     const { _id } = req.body; // production process ID
-
     if (!_id) {
       return res.status(400).json({
         success: false,
@@ -374,6 +374,7 @@ exports.startProduction = async (req, res) => {
       });
     }
 
+    // 1️⃣ Find the production process
     const process = await ProductionProcess.findById(_id);
     if (!process) {
       return res.status(404).json({
@@ -382,7 +383,7 @@ exports.startProduction = async (req, res) => {
       });
     }
 
-    // Optional: Check if current status is "inventory in transit"
+    // 2️⃣ Make sure status is correct before starting
     if (process.status !== "inventory in transit") {
       return res.status(400).json({
         success: false,
@@ -390,6 +391,46 @@ exports.startProduction = async (req, res) => {
       });
     }
 
+    // 3️⃣ Fetch the BOM linked to this process
+    const bom = await BOM.findById(process.bom)
+      .populate("raw_materials")
+      .populate("finished_good");
+
+    if (!bom) {
+      throw new ErrorHandler("BOM not found", 404);
+    }
+
+    // 4️⃣ Mark BOM as production started
+    bom.is_production_started = true;
+    await bom.save();
+
+    // 5️⃣ Deduct raw materials from stock
+    await Promise.all(
+      bom.raw_materials.map(async (materialId) => {
+        const material = await BOMRawMaterial.findById(materialId);
+        const product = await Product.findById(material.item);
+        if (product) {
+          product.current_stock =
+            (product.current_stock || 0) - material.quantity;
+          product.change_type = "decrease";
+          product.quantity_changed = material.quantity;
+          await product.save();
+        }
+      })
+    );
+
+    // 6️⃣ Add finished goods to stock
+    // const finishedGoodData = await BOMFinishedMaterial.findById(bom.finished_good);
+    // const finishedProduct = await Product.findById(finishedGoodData.item);
+    // if (finishedProduct) {
+    //   finishedProduct.current_stock =
+    //     (finishedProduct.current_stock || 0) + finishedGoodData.quantity;
+    //   finishedProduct.change_type = "increase";
+    //   finishedProduct.quantity_changed = finishedGoodData.quantity;
+    //   await finishedProduct.save();
+    // }
+
+    // 7️⃣ Update process status
     process.status = "production started";
     process.productionStartedAt = new Date();
     await process.save();
@@ -399,6 +440,7 @@ exports.startProduction = async (req, res) => {
       message: "Production started successfully",
       process,
     });
+
   } catch (error) {
     console.error("Error in startProduction:", error);
     res.status(500).json({
@@ -407,7 +449,8 @@ exports.startProduction = async (req, res) => {
       error: error.message,
     });
   }
-}; // yeeeee
+};
+ // yeeeee
 
 
 exports.markDone = TryCatch(async (req, res) => {
