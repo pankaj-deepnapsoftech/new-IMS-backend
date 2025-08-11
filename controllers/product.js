@@ -459,7 +459,7 @@ exports.bulkUploadHandlerIndirect = async (req, res) => {
 exports.workInProgressProducts = TryCatch(async (req, res) => {
   const products = [];
   const processes = await ProductionProcess.find({
-    status: "work in progress",
+    status: "production started",
   })
     .populate({
       path: "raw_materials",
