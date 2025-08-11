@@ -37,7 +37,7 @@ exports.update = TryCatch(async (req, res) => {
     },
     { new: true }
   );
-
+  
   res.status(200).json({
     status: 200,
     success: true,
@@ -96,8 +96,9 @@ exports.all = TryCatch(async (req, res) => {
       { path: "creator", model: "User" },
       { path: "buyer", model: "Parties" },
       { path: "store", model: "Store" }
-    ]);
-
+      
+    ])
+   .populate({  path:"items.item", model: "Product" });
   res.status(200).json({
     status: 200,
     success: true,

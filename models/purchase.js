@@ -62,7 +62,7 @@ const Purchases = new Schema(
     delivery_status_comment_by_customer: { type: String, trim: true },
     mode_of_payment: {
       type: String,
-      enum: ["cash", "cheque", "NEFT/RTGS", "UPI"],
+      enum: ["Cash", "Cheque", "NEFT/RTGS", "UPI", "Debit Card", "Credit Card"],
       required: true,
       trim: true,
     },

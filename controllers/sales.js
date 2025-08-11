@@ -25,6 +25,15 @@ exports.create = TryCatch(async (req, res) => {
       order_id,
       //   productFile: productFilePath,
     };
+
+    if (req.body.sale_id) {
+      const Purchase = require("../models/purchase");
+      await Purchase.findByIdAndUpdate(
+        req.body.sale_id,
+        { sale_status: "BOM Created" },
+        { new: true }
+      );
+    }
     await Purchase.create(newData);
     return res.status(201).json({ message: "Purchase Order Generated" });
   } catch (error) {
@@ -258,6 +267,22 @@ exports.getAll = TryCatch(async (req, res) => {
         },
       },
     },
+    {
+      $project: {
+        sale_status: 1, // ✅ new field
+        order_id: 1,
+        price: 1,
+        product_qty: 1,
+        GST: 1,
+        total_price: 1,
+        user_id: 1,
+        customer_id: 1,
+        product_id: 1,
+        party: 1,
+        assinedto: 1,
+        boms: 1
+      }
+    }
   ])
     .sort({ _id: -1 })
     .skip(skip)
@@ -505,7 +530,7 @@ exports.Delivered = TryCatch(async (req, res) => {
         message: "data not found",
       });
     }
- 
+
     const path = `https://rtpasbackend.deepmart.shop/images/${filename}`;
     console.log("req.body.role=", req.body.role);
     if ((req.body.role = "Dispatcher")) {

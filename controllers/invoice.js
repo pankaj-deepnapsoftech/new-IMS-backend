@@ -1,87 +1,175 @@
 const Invoice = require("../models/invoice");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 
-exports.create = TryCatch(async (req, res)=>{
-    const invoice = req.body;
-    if(!invoice){
-        throw new ErrorHandler('Please provide all the fields', 400);
-    }
+exports.create = TryCatch(async (req, res) => {
+  const {
+    invoiceNo,
+    consigneeShipTo,
+    address,
+    gstin,
+    billerAddress,
+    billerGSTIN,
+    deliveryNote,
+    modeTermsOfPayment,
+    referenceNo,
+    otherReferences,
+    buyersOrderNo,
+    date,
+    dispatchDocNo,
+    deliveryNoteDate,
+    dispatchedThrough,
+    destination,
+    termsOfDelivery,
+    remarks,
+    // Legacy fields
+    category,
+    buyer,
+    supplier,
+    invoice_no,
+    document_date,
+    sales_order_date,
+    store,
+    note,
+    items,
+    subtotal,
+    tax,
+    total,
+  } = req.body;
 
-    const createdInvoice = await Invoice.create({...invoice, balance: invoice.total, creator: req.user._id});
+  const invoiceData = {
+    invoiceNo,
+    consigneeShipTo,
+    address,
+    gstin,
+    billerAddress,
+    billerGSTIN,
+    deliveryNote,
+    modeTermsOfPayment,
+    referenceNo,
+    otherReferences,
+    buyersOrderNo,
+    date,
+    dispatchDocNo,
+    deliveryNoteDate,
+    dispatchedThrough,
+    destination,
+    termsOfDelivery,
+    remarks,
+    creator: req.user._id,
+  };
 
-    res.status(200).json({
-        status: 200,
-        success: true,
-        invoice: createdInvoice._doc,
-        message: "Invoice created successfully"
-    })
-})
-exports.update = TryCatch(async (req, res)=>{
-    const {_id} = req.params;
-    if(!_id){
-        throw new ErrorHandler("Proforma Invoice doesn't exist", 400);
-    }
-    const invoice = req.body;
-    if(!invoice){
-        throw new ErrorHandler("Please provide all the fileds", 400);
-    }
+  // Add legacy fields if provided
+  if (category) invoiceData.category = category;
+  if (buyer) invoiceData.buyer = buyer;
+  if (supplier) invoiceData.supplier = supplier;
+  if (invoice_no) invoiceData.invoice_no = invoice_no;
+  if (document_date) invoiceData.document_date = document_date;
+  if (sales_order_date) invoiceData.sales_order_date = sales_order_date;
+  if (store) invoiceData.store = store;
+  if (note) invoiceData.note = note;
+  if (items) invoiceData.items = items;
+  if (subtotal) invoiceData.subtotal = subtotal;
+  if (tax) invoiceData.tax = tax;
+  if (total) {
+    invoiceData.total = total;
+    invoiceData.balance = total; // Set balance equal to total initially
+  }
 
-    const updatedInvoice = await Invoice.findByIdAndUpdate({_id: _id}, {
-        $set: {...invoice, items: invoice.items}
-    }, {new: true});
+  const createdInvoice = await Invoice.create(invoiceData);
 
-    res.status(200).json({
-        status: 200,
-        success: true,
-        message: "Proforma Invoice has been updated successfully",
-        invoice: updatedInvoice._doc
+  res.status(201).json({
+    status: 201,
+    success: true,
+    invoice: createdInvoice._doc,
+    message: "Invoice created successfully",
+  });
+});
+exports.update = TryCatch(async (req, res) => {
+  const { _id } = req.params;
+  if (!_id) {
+    throw new ErrorHandler("Invoice doesn't exist", 400);
+  }
+
+  const updateData = req.body;
+  if (!updateData || Object.keys(updateData).length === 0) {
+    throw new ErrorHandler("Please provide fields to update", 400);
+  }
+
+  // Update balance if total is being updated
+  if (updateData.total) {
+    updateData.balance = updateData.total;
+  }
+
+  const updatedInvoice = await Invoice.findByIdAndUpdate(
+    { _id: _id },
+    { $set: updateData },
+    { new: true, runValidators: true }
+  )
+    .populate("creator buyer supplier store")
+    .populate({
+      path: "items.item",
+      model: "Product",
     });
-})
-exports.remove = TryCatch(async (req, res)=>{
-    const {_id} = req.params;
-    if(!_id){
-        throw new ErrorHandler("Invoice Id not provided", 400);
-    }
 
-    const invoice = await Invoice.findOne({_id: _id});
-    if(!invoice){
-        throw new ErrorHandler("Invoice doesn't exist", 400);
-    }
-    await invoice.deleteOne();
+  if (!updatedInvoice) {
+    throw new ErrorHandler("Invoice not found", 404);
+  }
 
-    res.status(200).json({
-        status: 200,
-        success: true,
-        message: "Invoice deleted successfully"
-    })
-})
-exports.details = TryCatch(async (req, res)=>{
-    const {_id} = req.params;
-    if(!_id){
-        throw new ErrorHandler("Invoice Id not provided", 400);
-    }
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Invoice has been updated successfully",
+    invoice: updatedInvoice._doc,
+  });
+});
+exports.remove = TryCatch(async (req, res) => {
+  const { _id } = req.params;
+  if (!_id) {
+    throw new ErrorHandler("Invoice Id not provided", 400);
+  }
 
-    const invoice = await Invoice.findOne({_id: _id}).populate('creator supplier buyer store').populate({
-        path: "items.item",
-        model: "Product"
+  const invoice = await Invoice.findOne({ _id: _id });
+  if (!invoice) {
+    throw new ErrorHandler("Invoice doesn't exist", 400);
+  }
+  await invoice.deleteOne();
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Invoice deleted successfully",
+  });
+});
+exports.details = TryCatch(async (req, res) => {
+  const { _id } = req.params;
+  if (!_id) {
+    throw new ErrorHandler("Invoice Id not provided", 400);
+  }
+
+  const invoice = await Invoice.findOne({ _id: _id })
+    .populate("creator supplier buyer store")
+    .populate({
+      path: "items.item",
+      model: "Product",
     });
-;
-    if(!invoice){
-        throw new ErrorHandler("Invoice doesn't exist", 400);
-    }
+  if (!invoice) {
+    throw new ErrorHandler("Invoice doesn't exist", 400);
+  }
 
-    res.status(200).json({
-        status: 200,
-        success: true,
-        invoice: invoice._doc
-    })
-})
-exports.all = TryCatch(async (req, res)=>{
-    const Invoices = await Invoice.find().populate('creator buyer supplier store');;
+  res.status(200).json({
+    status: 200,
+    success: true,
+    invoice: invoice._doc,
+  });
+});
+exports.all = TryCatch(async (req, res) => {
+  const Invoices = await Invoice.find().populate(
+    "creator buyer supplier store"
+  );
 
-    res.status(200).json({
-        status: 200,
-        success: true,
-        invoices: Invoices
-    });
-})
+  res.status(200).json({
+    status: 200,
+    success: true,
+    invoices: Invoices,
+  });
+});
