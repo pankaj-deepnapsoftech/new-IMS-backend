@@ -663,38 +663,317 @@ exports.autoBom = TryCatch(async (req, res) => {
     throw new ErrorHandler("product id is required", 400);
   }
 
+  // Mongo Query to find full BOM detail against product_name
+  // const boms = await BOM.aggregate([
 
-const result = await BOM.aggregate([
-  {
-    $lookup: {
-      from: "bom-finished-materials",
-      localField: "finished_good",
-      foreignField: "_id",
-      as: "finished_good"
-    }
-  },
-  { $unwind: "$finished_good" },
-  {
-    $lookup: {
-      from: "products",
-      localField: "finished_good.item",
-      foreignField: "_id",
-      as: "finished_good.item"
-    }
-  },
-  { $unwind: "$finished_good.item" },
-  {
-    $match: {
-      "finished_good.item._id":  new ObjectId(product_id)
-    }
-  },
-  {
-    $project: {
-      _id: 1
-    }
-  } ]);  // const bomDoc = await BOM.findById(result[0]).populate('finished_good');
+  //   // Finished Good lookup (unchanged)
+  //   {
+  //     $lookup: {
+  //       from: "bom-finished-materials",
+  //       localField: "finished_good",
+  //       foreignField: "_id",
+  //       as: "finished_good"
+  //     }
+  //   },
+  //   { $unwind: "$finished_good" },
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "finished_good.item",
+  //       foreignField: "_id",
+  //       as: "finished_good.item"
+  //     }
+  //   },
+  //   { $unwind: "$finished_good.item" },
+
+  //   // Raw Materials lookup (unchanged)
+  //   { $unwind: { path: "$raw_materials", preserveNullAndEmptyArrays: true } },
+  //   {
+  //     $lookup: {
+  //       from: "bom-raw-materials",
+  //       localField: "raw_materials",
+  //       foreignField: "_id",
+  //       as: "raw_materials.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$raw_materials.item", preserveNullAndEmptyArrays: true } },
+
+  //   // NEW: Populate raw_materials.item.item (product document)
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "raw_materials.item.item",
+  //       foreignField: "_id",
+  //       as: "raw_materials.item.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$raw_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+  //   {
+  //     $group: {
+  //       _id: "$_id",
+  //       doc: { $first: "$$ROOT" },
+  //       raw_materials: { $push: "$raw_materials" }
+  //     }
+  //   },
+  //   {
+  //     $addFields: {
+  //       "doc.raw_materials": {
+  //         $cond: [
+  //           { $eq: [{ $arrayElemAt: ["$raw_materials", 0] }, null] },
+  //           [],
+  //           "$raw_materials"
+  //         ]
+  //       }
+  //     }
+  //   },
+  //   { $replaceRoot: { newRoot: "$doc" } },
+
+  //   // Scrap Materials lookup (unchanged)
+  //   { $unwind: { path: "$scrap_materials", preserveNullAndEmptyArrays: true } },
+  //   {
+  //     $lookup: {
+  //       from: "bom-scrap-materials",
+  //       localField: "scrap_materials",
+  //       foreignField: "_id",
+  //       as: "scrap_materials.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$scrap_materials.item", preserveNullAndEmptyArrays: true } },
+
+  //   // NEW: Populate scrap_materials.item.item (product document)
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "scrap_materials.item.item",
+  //       foreignField: "_id",
+  //       as: "scrap_materials.item.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$scrap_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+  //   {
+  //     $group: {
+  //       _id: "$_id",
+  //       doc: { $first: "$$ROOT" },
+  //       scrap_materials: { $push: "$scrap_materials" }
+  //     }
+  //   },
+  //   {
+  //     $addFields: {
+  //       "doc.scrap_materials": {
+  //         $cond: [
+  //           { $eq: [{ $arrayElemAt: ["$scrap_materials", 0] }, null] },
+  //           [],
+  //           "$scrap_materials"
+  //         ]
+  //       }
+  //     }
+  //   },
+  //   { $replaceRoot: { newRoot: "$doc" } }
+
+  // ]);
+
+  // Mongo Query to find full BOM detail against product_name
+  // const boms = await BOM.aggregate([
+
+  //   // Finished Good lookup (unchanged)
+  //   {
+  //     $lookup: {
+  //       from: "bom-finished-materials",
+  //       localField: "finished_good",
+  //       foreignField: "_id",
+  //       as: "finished_good"
+  //     }
+  //   },
+  //   { $unwind: "$finished_good" },
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "finished_good.item",
+  //       foreignField: "_id",
+  //       as: "finished_good.item"
+  //     }
+  //   },
+  //   { $unwind: "$finished_good.item" },
+  //   {
+  //     $match: {
+  //       "finished_good.item.name": product_name
+  //     }
+  //   },
+
+  //   // // Raw Materials lookup (unchanged)
+  //   { $unwind: { path: "$raw_materials", preserveNullAndEmptyArrays: true } },
+  //   {
+  //     $lookup: {
+  //       from: "bom-raw-materials",
+  //       localField: "raw_materials",
+  //       foreignField: "_id",
+  //       as: "raw_materials.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$raw_materials.item", preserveNullAndEmptyArrays: true } },
+
+  //   // // NEW: Populate raw_materials.item.item (product document)
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "raw_materials.item.item",
+  //       foreignField: "_id",
+  //       as: "raw_materials.item.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$raw_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+  //   {
+  //     $group: {
+  //       _id: "$_id",
+  //       doc: { $first: "$$ROOT" },
+  //       raw_materials: { $push: "$raw_materials" }
+  //     }
+  //   },
+  //   {
+  //     $addFields: {
+  //       "doc.raw_materials": {
+  //         $cond: [
+  //           { $eq: [{ $arrayElemAt: ["$raw_materials", 0] }, null] },
+  //           [],
+  //           "$raw_materials"
+  //         ]
+  //       }
+  //     }
+  //   },
+  //   { $replaceRoot: { newRoot: "$doc" } },
+
+  //   // Scrap Materials lookup (unchanged)
+  //   { $unwind: { path: "$scrap_materials", preserveNullAndEmptyArrays: true } },
+  //   {
+  //     $lookup: {
+  //       from: "bom-scrap-materials",
+  //       localField: "scrap_materials",
+  //       foreignField: "_id",
+  //       as: "scrap_materials.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$scrap_materials.item", preserveNullAndEmptyArrays: true } },
+
+  //   // NEW: Populate scrap_materials.item.item (product document)
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "scrap_materials.item.item",
+  //       foreignField: "_id",
+  //       as: "scrap_materials.item.item"
+  //     }
+  //   },
+  //   { $unwind: { path: "$scrap_materials.item.item", preserveNullAndEmptyArrays: true } },
+
+  //   {
+  //     $group: {
+  //       _id: "$_id",
+  //       doc: { $first: "$$ROOT" },
+  //       scrap_materials: { $push: "$scrap_materials" }
+  //     }
+  //   },
+  //   {
+  //     $addFields: {
+  //       "doc.scrap_materials": {
+  //         $cond: [
+  //           { $eq: [{ $arrayElemAt: ["$scrap_materials", 0] }, null] },
+  //           [],
+  //           "$scrap_materials"
+  //         ]
+  //       }
+  //     }
+  //   },
+  //   { $replaceRoot: { newRoot: "$doc" } }
+
+  // ]);
+
+  // Mongo query to find BOM _id against product name
+  // const result = await BOM.aggregate([
+  //   // Step 1: Lookup finished_good doc
+  //   {
+  //     $lookup: {
+  //       from: "bom-finished-materials",
+  //       localField: "finished_good",
+  //       foreignField: "_id",
+  //       as: "finished_good"
+  //     }
+  //   },
+  //   { $unwind: "$finished_good" },
+  //   // Step 2: Lookup product from finished_good.item
+  //   {
+  //     $lookup: {
+  //       from: "products",
+  //       localField: "finished_good.item",
+  //       foreignField: "_id",
+  //       as: "finished_good.item"
+  //     }
+  //   },
+  //   { $unwind: "$finished_good.item" },
+  //   // Step 3: Match product name
+  //   {
+  //     $match: {
+  //       "finished_good.item.name": product_name
+  //     }
+  //   },
+  //   // Step 4: Project only BOM _id
+  //   { $unwind: "$finished_good.item.name" },
+  //   {
+  //     $project: {
+  //       _id: 1
+  //     }
+  //   },
+
+  // ]);
+
+  const result = await BOM.aggregate([
+    {
+      $lookup: {
+        from: "bom-finished-materials",
+        localField: "finished_good",
+        foreignField: "_id",
+        as: "finished_good",
+      },
+    },
+    { $unwind: "$finished_good" },
+    {
+      $lookup: {
+        from: "products",
+        localField: "finished_good.item",
+        foreignField: "_id",
+        as: "finished_good.item",
+      },
+    },
+    { $unwind: "$finished_good.item" },
+    {
+      $match: {
+        "finished_good.item._id": new ObjectId(product_id),
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+      },
+    },
+  ]);
+
+  if (result.length === 0) {
+    return res.status(400).json({
+      status: 400,
+      success: false,
+      boms: "BOM does not exists",
+    });
+  }
+  // const bomDoc = await BOM.findById(result[0]).populate('finished_good');
   // const bomDoc = await BOM.findById(result[0]._id).populate('finished_good');
 
+  // bomDoc.finished_good.quantity = Number(quantity);
+  // bomDoc.finished_good = bomDoc.finished_good._id;
+  // const finalBom = await BOM.create(bomDoc);
+  // await finalBom.save();
+  // Fetch original BOM document with populate
 
 
 if(result.length === 0){
@@ -726,6 +1005,9 @@ const newFinishedGood = {
 const prod = await Product.findById(newFinishedGood.item);
 newFinishedGood.item = prod;
 
+  // // Create a plain object copy without _id (so that new document can be created)
+  // const newBomData = bomDoc.toObject();
+  // delete newBomData._id;
 const newBomDoc = {
   ...originalBomDoc.toObject(),
   finished_good: newFinishedGood,
@@ -852,8 +1134,8 @@ console.log('newBomDoc:', newBomDoc);
   res.status(200).json({
     status: 200,
     success: true,
-    boms: finalBom,
-    // boms: "orignia",
+    // boms: finalBom,
+    boms: "orignia",
     originalBomDoc: originalBomDoc,
     newBomDoc: newBomDoc
   });
