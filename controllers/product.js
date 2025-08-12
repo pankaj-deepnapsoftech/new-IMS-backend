@@ -10,12 +10,13 @@ const { generateProductId } = require("../utils/generateProductId");
 const path = require("path");
 const XLSX = require("xlsx");
 const Store = require("../models/store");
-const { checkIndirectProductCsvValidity } = require("../utils/checkIndirectProductCsvValidity");
-
+const {
+  checkIndirectProductCsvValidity,
+} = require("../utils/checkIndirectProductCsvValidity");
 
 exports.create = TryCatch(async (req, res) => {
   const productDetails = req.body;
-  console.log("Product details",productDetails);
+  console.log("Product details", productDetails);
   if (!productDetails) {
     throw new ErrorHandler("Please provide product details", 400);
   }
@@ -72,7 +73,7 @@ exports.update = TryCatch(async (req, res) => {
     product,
   });
 });
- 
+
 exports.remove = TryCatch(async (req, res) => {
   const { _id } = req.body;
   const product = await Product.findByIdAndDelete(_id);
@@ -175,10 +176,25 @@ exports.bulkUploadHandler = async (req, res) => {
     // Validate the data
     await checkProductCsvValidity(jsonData);
 
+    // Debug: Log the first product to see the structure
+    if (jsonData.length > 0) {
+      console.log(
+        "First product sample:",
+        JSON.stringify(jsonData[0], null, 2)
+      );
+    }
+
     // Process products and generate IDs for all products (ignoring any provided IDs)
     const processedProducts = [];
     for (const productData of jsonData) {
       let processedProduct = { ...productData };
+
+      // Debug: Log HSN code for each product
+      console.log(
+        `Product: ${productData.name}, HSN code: ${
+          productData.hsn_code
+        }, Type: ${typeof productData.hsn_code}`
+      );
 
       // Always generate product_id automatically (ignore any provided product_id)
       processedProduct.product_id = await generateProductId(
@@ -247,8 +263,19 @@ exports.bulkUploadHandler = async (req, res) => {
           processedProduct.distributor_price
         );
       }
-      if (processedProduct.hsn_code) {
+      if (
+        processedProduct.hsn_code !== undefined &&
+        processedProduct.hsn_code !== null &&
+        processedProduct.hsn_code !== ""
+      ) {
         processedProduct.hsn_code = processedProduct.hsn_code.toString().trim();
+        // If after trimming it becomes empty, delete it
+        if (processedProduct.hsn_code === "") {
+          delete processedProduct.hsn_code;
+        }
+      } else {
+        // Remove hsn_code if it's empty, null, or undefined
+        delete processedProduct.hsn_code;
       }
 
       if (
@@ -409,8 +436,19 @@ exports.bulkUploadHandlerIndirect = async (req, res) => {
           processedProduct.distributor_price
         );
       }
-      if (processedProduct.hsn_code) {
+      if (
+        processedProduct.hsn_code !== undefined &&
+        processedProduct.hsn_code !== null &&
+        processedProduct.hsn_code !== ""
+      ) {
         processedProduct.hsn_code = processedProduct.hsn_code.toString().trim();
+        // If after trimming it becomes empty, delete it
+        if (processedProduct.hsn_code === "") {
+          delete processedProduct.hsn_code;
+        }
+      } else {
+        // Remove hsn_code if it's empty, null, or undefined
+        delete processedProduct.hsn_code;
       }
 
       if (
@@ -670,7 +708,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
   // Set response headers
   res.setHeader(
     "Content-Type",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"   
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   );
   res.setHeader(
     "Content-Disposition",
@@ -685,7 +723,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
 exports.rawMaterials = TryCatch(async (req, res) => {
   const rawMaterials = await Product.find({
     category: "raw materials",
-    approved: true
+    approved: true,
   }).select("name _id");
   res.status(200).json({
     status: 200,
@@ -877,7 +915,10 @@ exports.updateInventory = TryCatch(async (req, res) => {
   const { itemId, buyQuantity, newPrice } = req.body;
 
   if (!itemId || !buyQuantity || !newPrice) {
-    throw new ErrorHandler("Please provide itemId, buyQuantity, and newPrice", 400);
+    throw new ErrorHandler(
+      "Please provide itemId, buyQuantity, and newPrice",
+      400
+    );
   }
 
   // Find the product
@@ -889,10 +930,11 @@ exports.updateInventory = TryCatch(async (req, res) => {
   // Calculate new stock and average price
   const currentStock = product.current_stock || 0;
   const currentPrice = product.price || 0;
-  
-  const totalValue = (currentStock * currentPrice) + (buyQuantity * newPrice);
+
+  const totalValue = currentStock * currentPrice + buyQuantity * newPrice;
   const newTotalStock = currentStock + buyQuantity;
-  const newAveragePrice = newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : newPrice;
+  const newAveragePrice =
+    newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : newPrice;
 
   // Update the product
   const updatedProduct = await Product.findByIdAndUpdate(
@@ -915,6 +957,6 @@ exports.updateInventory = TryCatch(async (req, res) => {
     priceDifference: Math.round(newPrice - currentPrice),
     newAveragePrice: newAveragePrice,
     previousStock: currentStock,
-    newStock: newTotalStock
+    newStock: newTotalStock,
   });
 });
