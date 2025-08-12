@@ -1041,7 +1041,7 @@ exports.getInventoryShortages = TryCatch(async (req, res) => {
   const shortages = await InventoryShortage.find()
     .populate({
       path: "item",
-      select: "name current_stock price",
+      select: "name current_stock updated_stock price updated_price",
     })
     .populate({
       path: "bom",
@@ -1057,7 +1057,9 @@ exports.getInventoryShortages = TryCatch(async (req, res) => {
     item: shortage.item?._id || null,
     shortage_quantity: shortage.shortage_quantity,
     current_stock: shortage.item?.current_stock || 0,
+    updated_stock: shortage.item?.updated_stock || null,
     current_price: shortage.item?.price || 0,
+    updated_price: shortage.item?.updated_price || null,
     updated_at: shortage.updatedAt,
   }));
 
