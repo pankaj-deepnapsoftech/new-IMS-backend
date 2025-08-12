@@ -9,6 +9,7 @@ const roundAllPrices = async () => {
     const products = await Product.find({
       $or: [
         { price: { $exists: true } },
+        { latest_price: { $exists: true } },
         { regular_buying_price: { $exists: true } },
         { wholesale_buying_price: { $exists: true } },
         { mrp: { $exists: true } },
@@ -28,6 +29,11 @@ const roundAllPrices = async () => {
       // Check and round each price field
       if (product.price !== undefined && product.price % 1 !== 0) {
         updateData.price = Math.round(product.price);
+        needsUpdate = true;
+      }
+      
+      if (product.latest_price !== undefined && product.latest_price % 1 !== 0) {
+        updateData.latest_price = Math.round(product.latest_price);
         needsUpdate = true;
       }
       

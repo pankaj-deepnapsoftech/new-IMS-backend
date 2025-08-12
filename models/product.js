@@ -41,11 +41,22 @@ const productSchema = new Schema(
       type: Number,
       required: [true, "Current Stock is a required field"],
     },
+    updated_stock: {
+      type: Number,
+      default: null,
+    },
     change_type: { type: String, enum: ["increase", "decrease"] },
     quantity_changed: { type: Number },
     price: {
       type: Number,
       required: [true, "Product Price is a required field"],
+    },
+    latest_price: {
+      type: Number,
+    },
+    updated_price: {
+      type: Number,
+      default: null,
     },
     min_stock: Number,
     max_stock: Number,
@@ -100,6 +111,12 @@ productSchema.pre('save', function(next) {
   if (this.price !== undefined) {
     this.price = Math.round(this.price);
   }
+  if (this.latest_price !== undefined) {
+    this.latest_price = Math.round(this.latest_price);
+  }
+  if (this.updated_price !== undefined && this.updated_price !== null) {
+    this.updated_price = Math.round(this.updated_price);
+  }
   if (this.regular_buying_price !== undefined) {
     this.regular_buying_price = Math.round(this.regular_buying_price);
   }
@@ -124,6 +141,12 @@ productSchema.pre('findOneAndUpdate', function(next) {
   if (update.price !== undefined) {
     update.price = Math.round(update.price);
   }
+  if (update.latest_price !== undefined) {
+    update.latest_price = Math.round(update.latest_price);
+  }
+  if (update.updated_price !== undefined && update.updated_price !== null) {
+    update.updated_price = Math.round(update.updated_price);
+  }
   if (update.regular_buying_price !== undefined) {
     update.regular_buying_price = Math.round(update.regular_buying_price);
   }
@@ -147,6 +170,12 @@ productSchema.pre('findByIdAndUpdate', function(next) {
   const update = this.getUpdate();
   if (update.price !== undefined) {
     update.price = Math.round(update.price);
+  }
+  if (update.latest_price !== undefined) {
+    update.latest_price = Math.round(update.latest_price);
+  }
+  if (update.updated_price !== undefined && update.updated_price !== null) {
+    update.updated_price = Math.round(update.updated_price);
   }
   if (update.regular_buying_price !== undefined) {
     update.regular_buying_price = Math.round(update.regular_buying_price);

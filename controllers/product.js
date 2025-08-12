@@ -926,25 +926,27 @@ exports.updateInventory = TryCatch(async (req, res) => {
   if (!product) {
     throw new ErrorHandler("Product doesn't exist", 400);
   }
+  
 
   // Calculate new stock and average price
   const currentStock = product.current_stock || 0;
   const currentPrice = product.price || 0;
-
-  const totalValue = currentStock * currentPrice + buyQuantity * newPrice;
+  const updatedPrice = Number(newPrice); // The price entered by user
+  
+  const totalValue = (currentStock * currentPrice) + (buyQuantity * updatedPrice);
   const newTotalStock = currentStock + buyQuantity;
-  const newAveragePrice =
-    newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : newPrice;
+  const finalPrice = newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : updatedPrice;
 
   // Update the product
   const updatedProduct = await Product.findByIdAndUpdate(
     itemId,
     {
       current_stock: newTotalStock,
-      price: newAveragePrice,
+      price: finalPrice,
+      latest_price: finalPrice, // Update latest price
       change_type: "increase",
       quantity_changed: buyQuantity,
-      regular_buying_price: newPrice, // Update regular buying price
+      regular_buying_price: updatedPrice, // Update regular buying price
     },
     { new: true }
   );
@@ -954,9 +956,195 @@ exports.updateInventory = TryCatch(async (req, res) => {
     success: true,
     message: "Inventory updated successfully",
     product: updatedProduct,
-    priceDifference: Math.round(newPrice - currentPrice),
-    newAveragePrice: newAveragePrice,
+    currentPrice: currentPrice, // Current price before update
+    updatedPrice: updatedPrice, // Price entered by user
+    finalPrice: finalPrice, // Final price after update (calculated average)
+    priceDifference: Math.round(updatedPrice - currentPrice),
     previousStock: currentStock,
     newStock: newTotalStock,
+  });
+});
+
+exports.updatePrice = TryCatch(async (req, res) => {
+  const { productId, newPrice } = req.body;
+
+  if (!productId || newPrice === undefined) {
+    throw new ErrorHandler("Please provide productId and newPrice", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  const currentPrice = product.price || 0;
+  const updatedPrice = Number(newPrice); // The price entered by user
+  const currentStock = product.current_stock || 0;
+
+  // Update the product with new updated_price field instead of replacing current price
+  const updatedProduct = await Product.findByIdAndUpdate(
+    productId,
+    {
+      updated_price: updatedPrice, // Store updated price in new field
+      latest_price: updatedPrice, // Update latest price for reference
+    },
+    { new: true }
+  );
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Price updated successfully",
+    product: updatedProduct,
+    currentPrice: currentPrice, // Current price before update
+    updatedPrice: updatedPrice, // Price entered by user
+    finalPrice: finalPrice, // Final price after update
+    priceDifference: finalPrice - currentPrice,
+    currentStock: currentStock // Current stock information
+  });
+});
+
+exports.updateStock = TryCatch(async (req, res) => {
+  const { productId, newStock } = req.body;
+
+  if (!productId || newStock === undefined) {
+    throw new ErrorHandler("Please provide productId and newStock", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  const currentStock = product.current_stock || 0;
+  const updatedStock = Number(newStock); // The stock entered by user
+  const finalStock = currentStock + updatedStock; // Final stock = current stock + updated stock
+
+  // Update the product stock
+  const updatedProduct = await Product.findByIdAndUpdate(
+    productId,
+    {
+      current_stock: finalStock,
+    },
+    { new: true }
+  );
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Updated stock saved successfully",
+    product: updatedProduct,
+    currentStock: currentStock, // Original stock remains unchanged
+    updatedStock: updatedStock, // New updated stock
+    totalAvailableStock: currentStock + updatedStock, // Total available stock
+    stockDifference: updatedStock
+  });
+});
+
+// Function to clear updated price (optional - if you want to reset updated price)
+exports.clearUpdatedPrice = TryCatch(async (req, res) => {
+  const { productId } = req.body;
+
+  if (!productId) {
+    throw new ErrorHandler("Please provide productId", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  // Clear the updated price field only
+  const updatedProduct = await Product.findByIdAndUpdate(
+    productId,
+    {
+      updated_price: null, // Clear the updated price field
+    },
+    { new: true }
+  );
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Updated price cleared successfully",
+    product: updatedProduct,
+    currentPrice: product.price,
+    clearedUpdatedPrice: product.updated_price
+  });
+});
+
+// Function to clear updated stock (optional - if you want to reset updated stock)
+exports.clearUpdatedStock = TryCatch(async (req, res) => {
+  const { productId } = req.body;
+
+  if (!productId) {
+    throw new ErrorHandler("Please provide productId", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  // Clear the updated stock field only
+  const updatedProduct = await Product.findByIdAndUpdate(
+    productId,
+    {
+      updated_stock: null, // Clear the updated stock field
+    },
+    { new: true }
+  );
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Updated stock cleared successfully",
+    product: updatedProduct,
+    currentStock: product.current_stock,
+    clearedUpdatedStock: product.updated_stock
+  });
+});
+
+// Function to remove item from inventory shortages when updated
+exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
+  const { productId } = req.body;
+
+  if (!productId) {
+    throw new ErrorHandler("Please provide productId", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  // Check if product has been updated (has updated_stock or updated_price)
+  const hasUpdates = (product.updated_stock && product.updated_stock !== null) || 
+                    (product.updated_price && product.updated_price !== null);
+
+  if (!hasUpdates) {
+    throw new ErrorHandler("Product has no updates to process", 400);
+  }
+
+  // Import InventoryShortage model
+  const InventoryShortage = require("../models/inventoryShortage");
+
+  // Remove all inventory shortages for this product
+  const deleteResult = await InventoryShortage.deleteMany({
+    item: productId
+  });
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Product removed from inventory shortages successfully",
+    product: product,
+    deletedShortages: deleteResult.deletedCount,
+    hasUpdates: hasUpdates
   });
 });
