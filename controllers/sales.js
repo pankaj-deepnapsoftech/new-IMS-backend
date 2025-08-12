@@ -282,8 +282,10 @@ exports.getAll = TryCatch(async (req, res) => {
         assinedto: 1,
         boms: 1,
         mode_of_payment: 1,
-      }
-    }
+        createdAt: 1,
+        terms_of_delivery: 1,
+      },
+    },
   ])
     .sort({ _id: -1 })
     .skip(skip)
@@ -318,6 +320,7 @@ exports.AddToken = TryCatch(async (req, res) => {
     message: "Token Amount added for sample :)",
   });
 });
+
 
 exports.getOne = TryCatch(async (req, res) => {
   const id = req.user._id;
@@ -470,6 +473,25 @@ exports.getOne = TryCatch(async (req, res) => {
             },
           ],
         },
+      },
+    },
+    {
+      $project: {
+        sale_status: 1,
+        order_id: 1,
+        price: 1,
+        product_qty: 1,
+        GST: 1,
+        total_price: 1,
+        user_id: 1,
+        customer_id: 1,
+        product_id: 1,
+        party: 1,
+        assinedto: 1,
+        boms: 1,
+        mode_of_payment: 1,
+        terms_of_delivery: 1,
+        createdAt: 1,
       },
     },
   ])

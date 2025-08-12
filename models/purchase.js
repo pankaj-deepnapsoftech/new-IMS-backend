@@ -66,6 +66,9 @@ const Purchases = new Schema(
       required: true,
       trim: true,
     },
+    terms_of_delivery: {
+      type: String,
+    },
   },
   { timestamps: true }
 );

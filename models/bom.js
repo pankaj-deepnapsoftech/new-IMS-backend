@@ -41,15 +41,13 @@ const bomSchema = new Schema(
     ],
     manpower: [
       {
-        user: {
-          type: Schema.Types.ObjectId,
-          ref: "User",
-          required: true,
-        },
-        role: { type: String },
-        working_hours: { type: Number },
-      },
+        number: {
+          type: String, // store as string, e.g., "5"
+          required: true
+        }
+      }
     ],
+
 
     processes: {
       type: [String],
