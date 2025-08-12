@@ -889,20 +889,22 @@ exports.updateInventory = TryCatch(async (req, res) => {
   // Calculate new stock and average price
   const currentStock = product.current_stock || 0;
   const currentPrice = product.price || 0;
+  const updatedPrice = Number(newPrice); // The price entered by user
   
-  const totalValue = (currentStock * currentPrice) + (buyQuantity * newPrice);
+  const totalValue = (currentStock * currentPrice) + (buyQuantity * updatedPrice);
   const newTotalStock = currentStock + buyQuantity;
-  const newAveragePrice = newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : newPrice;
+  const finalPrice = newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : updatedPrice;
 
   // Update the product
   const updatedProduct = await Product.findByIdAndUpdate(
     itemId,
     {
       current_stock: newTotalStock,
-      price: newAveragePrice,
+      price: finalPrice,
+      latest_price: finalPrice, // Update latest price
       change_type: "increase",
       quantity_changed: buyQuantity,
-      regular_buying_price: newPrice, // Update regular buying price
+      regular_buying_price: updatedPrice, // Update regular buying price
     },
     { new: true }
   );
@@ -912,9 +914,91 @@ exports.updateInventory = TryCatch(async (req, res) => {
     success: true,
     message: "Inventory updated successfully",
     product: updatedProduct,
-    priceDifference: Math.round(newPrice - currentPrice),
-    newAveragePrice: newAveragePrice,
+    currentPrice: currentPrice, // Current price before update
+    updatedPrice: updatedPrice, // Price entered by user
+    finalPrice: finalPrice, // Final price after update (calculated average)
+    priceDifference: Math.round(updatedPrice - currentPrice),
     previousStock: currentStock,
     newStock: newTotalStock
+  });
+});
+
+exports.updatePrice = TryCatch(async (req, res) => {
+  const { productId, newPrice } = req.body;
+
+  if (!productId || newPrice === undefined) {
+    throw new ErrorHandler("Please provide productId and newPrice", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  const currentPrice = product.price || 0;
+  const updatedPrice = Number(newPrice); // The price entered by user
+  const finalPrice = updatedPrice; // Final price after update
+  const currentStock = product.current_stock || 0;
+
+  // Update the product price
+  const updatedProduct = await Product.findByIdAndUpdate(
+    productId,
+    {
+      price: finalPrice,
+      latest_price: finalPrice, // Update latest price
+      regular_buying_price: finalPrice, // Also update regular buying price
+    },
+    { new: true }
+  );
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Price updated successfully",
+    product: updatedProduct,
+    currentPrice: currentPrice, // Current price before update
+    updatedPrice: updatedPrice, // Price entered by user
+    finalPrice: finalPrice, // Final price after update
+    priceDifference: finalPrice - currentPrice,
+    currentStock: currentStock // Current stock information
+  });
+});
+
+exports.updateStock = TryCatch(async (req, res) => {
+  const { productId, newStock } = req.body;
+
+  if (!productId || newStock === undefined) {
+    throw new ErrorHandler("Please provide productId and newStock", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  const currentStock = product.current_stock || 0;
+  const updatedStock = Number(newStock); // The stock entered by user
+  const finalStock = currentStock + updatedStock; // Final stock = current stock + updated stock
+
+  // Update the product stock
+  const updatedProduct = await Product.findByIdAndUpdate(
+    productId,
+    {
+      current_stock: finalStock,
+    },
+    { new: true }
+  );
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Stock updated successfully",
+    product: updatedProduct,
+    currentStock: currentStock, // Current stock before update
+    updatedStock: updatedStock, // Stock entered by user
+    finalStock: finalStock, // Final stock = current stock + updated stock
+    stockDifference: finalStock - currentStock
   });
 });

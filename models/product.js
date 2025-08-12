@@ -47,6 +47,9 @@ const productSchema = new Schema(
       type: Number,
       required: [true, "Product Price is a required field"],
     },
+    latest_price: {
+      type: Number,
+    },
     min_stock: Number,
     max_stock: Number,
     hsn_code: String,
@@ -100,6 +103,9 @@ productSchema.pre('save', function(next) {
   if (this.price !== undefined) {
     this.price = Math.round(this.price);
   }
+  if (this.latest_price !== undefined) {
+    this.latest_price = Math.round(this.latest_price);
+  }
   if (this.regular_buying_price !== undefined) {
     this.regular_buying_price = Math.round(this.regular_buying_price);
   }
@@ -124,6 +130,9 @@ productSchema.pre('findOneAndUpdate', function(next) {
   if (update.price !== undefined) {
     update.price = Math.round(update.price);
   }
+  if (update.latest_price !== undefined) {
+    update.latest_price = Math.round(update.latest_price);
+  }
   if (update.regular_buying_price !== undefined) {
     update.regular_buying_price = Math.round(update.regular_buying_price);
   }
@@ -147,6 +156,9 @@ productSchema.pre('findByIdAndUpdate', function(next) {
   const update = this.getUpdate();
   if (update.price !== undefined) {
     update.price = Math.round(update.price);
+  }
+  if (update.latest_price !== undefined) {
+    update.latest_price = Math.round(update.latest_price);
   }
   if (update.regular_buying_price !== undefined) {
     update.regular_buying_price = Math.round(update.regular_buying_price);
