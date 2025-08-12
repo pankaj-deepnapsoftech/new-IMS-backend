@@ -282,8 +282,10 @@ exports.getAll = TryCatch(async (req, res) => {
         assinedto: 1,
         boms: 1,
         mode_of_payment: 1,
-      }
-    }
+        createdAt: 1,
+        terms_of_delivery: 1,
+      },
+    },
   ])
     .sort({ _id: -1 })
     .skip(skip)
@@ -488,6 +490,8 @@ exports.getOne = TryCatch(async (req, res) => {
         assinedto: 1,
         boms: 1,
         mode_of_payment: 1,
+        terms_of_delivery: 1,
+        createdAt: 1,
       },
     },
   ])
