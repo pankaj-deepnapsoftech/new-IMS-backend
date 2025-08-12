@@ -953,11 +953,12 @@ exports.updatePrice = TryCatch(async (req, res) => {
   res.status(200).json({
     status: 200,
     success: true,
-    message: "Updated price saved successfully",
+    message: "Price updated successfully",
     product: updatedProduct,
-    currentPrice: currentPrice, // Original price remains unchanged
-    updatedPrice: updatedPrice, // New updated price
-    priceDifference: updatedPrice - currentPrice,
+    currentPrice: currentPrice, // Current price before update
+    updatedPrice: updatedPrice, // Price entered by user
+    finalPrice: finalPrice, // Final price after update
+    priceDifference: finalPrice - currentPrice,
     currentStock: currentStock // Current stock information
   });
 });
@@ -977,12 +978,13 @@ exports.updateStock = TryCatch(async (req, res) => {
 
   const currentStock = product.current_stock || 0;
   const updatedStock = Number(newStock); // The stock entered by user
+  const finalStock = currentStock + updatedStock; // Final stock = current stock + updated stock
 
-  // Update the product with new updated_stock field instead of replacing current_stock
+  // Update the product stock
   const updatedProduct = await Product.findByIdAndUpdate(
     productId,
     {
-      updated_stock: updatedStock, // Store updated stock in new field
+      current_stock: finalStock,
     },
     { new: true }
   );
