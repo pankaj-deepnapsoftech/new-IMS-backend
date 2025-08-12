@@ -280,7 +280,8 @@ exports.getAll = TryCatch(async (req, res) => {
         product_id: 1,
         party: 1,
         assinedto: 1,
-        boms: 1
+        boms: 1,
+        mode_of_payment: 1,
       }
     }
   ])

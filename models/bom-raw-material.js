@@ -43,12 +43,16 @@ const BOMRawMaterialSchema = new Schema(
     },
     approvedByAdmin: {
       type: Boolean,
-      default: false
+      default: false,
     },
     approvedByInventoryPersonnel: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
+    isInventoryApprovalClicked: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,

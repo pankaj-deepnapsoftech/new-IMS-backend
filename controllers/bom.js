@@ -974,36 +974,40 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
 
 exports.approveRawMaterial = TryCatch(async (req, res) => {
   const { _id } = req.body;
-  if (!_id) {
-    throw new ErrorHandler("Raw material id not provided", 400);
-  }
+  if (!_id) throw new ErrorHandler("Raw material id not provided", 400);
 
   const updatedRawMaterial = await BOMRawMaterial.findByIdAndUpdate(
-    { _id },
-    { approvedByInventoryPersonnel: true },
+    _id,
+    {
+      approvedByInventoryPersonnel: true,
+      isInventoryApprovalClicked: true // ✅ mark clicked for this raw material
+    },
     { new: true }
   );
-  const requiredBom = await BOM.findById(updatedRawMaterial.bom).populate(
-    "raw_materials"
-  );
-  const allRawMaterials = requiredBom.raw_materials;
+  if (!updatedRawMaterial) throw new ErrorHandler("Raw material not found", 404);
 
-  let areAllApproved = allRawMaterials.every(
-    (rm) => rm.approvedByInventoryPersonnel
+  const requiredBom = await BOM.findById(updatedRawMaterial.bom).populate("raw_materials");
+
+  const allApproved = requiredBom.raw_materials.every(
+    rm => rm.approvedByInventoryPersonnel
   );
 
-  if (areAllApproved && requiredBom.production_process) {
-    await ProductionProcess.findByIdAndUpdate(requiredBom.production_process, {
-      status: "Inventory Allocated",
-    });
+  if (allApproved && requiredBom.production_process) {
+    await ProductionProcess.findByIdAndUpdate(
+      requiredBom.production_process,
+      { status: "Inventory Allocated" }
+    );
   }
 
   res.status(200).json({
     status: 200,
     success: true,
-    message: "Raw material has been approved successfully",
+    message: "Raw material approval updated",
+    rawMaterial: updatedRawMaterial
   });
 });
+
+
 
 exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
   const allBoms = await BOM.find({ approved: true }).select(
@@ -1116,6 +1120,7 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
       __v: rm.__v,
       change_type: rm.change_type,
       quantity_changed: rm.quantity_changed,
+      isInventoryApprovalClicked: rm.isInventoryApprovalClicked
     });
   }
 
