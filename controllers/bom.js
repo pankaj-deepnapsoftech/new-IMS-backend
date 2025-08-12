@@ -30,8 +30,16 @@ exports.create = TryCatch(async (req, res) => {
     remarks,
     sales,
     resources,
-    manpower,
+    manpower 
   } = req.body;
+
+  
+  const manpowerData = Array.isArray(manpower)
+    ? manpower.map(mp => ({
+      user: mp.user || null,
+      number: String(mp.number ?? "0")
+    }))
+    : [];
 
   let insuffientStockMsg = "";
 
@@ -44,7 +52,8 @@ exports.create = TryCatch(async (req, res) => {
     total_cost === undefined
   ) {
     throw new ErrorHandler("Please provide all the fields", 400);
-  } 
+  }
+
   if (isNaN(parts_count) || isNaN(total_cost)) {
     throw new ErrorHandler("Part's count and Total cost must be a number", 400);
   }
@@ -54,7 +63,7 @@ exports.create = TryCatch(async (req, res) => {
     throw new ErrorHandler("Finished good doesn't exist", 400);
   }
 
-  // Check for stock and calculate shortages
+  // Check for stock shortages
   const shortages = [];
   await Promise.all(
     raw_materials.map(async (material) => {
@@ -76,7 +85,6 @@ exports.create = TryCatch(async (req, res) => {
   const { item, description, quantity, image, supporting_doc, comments, cost } =
     finished_good;
 
-  // Calculate the increase in finished good quantity based on negative raw material quantities
   const totalRawMaterialDecrease = raw_materials
     .filter(material => material.quantity < 0)
     .reduce((sum, material) => sum + Math.abs(material.quantity), 0);
@@ -110,19 +118,17 @@ exports.create = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-    manpower
+    manpower: manpowerData // ✅ use processed manpower here
   });
 
   if (raw_materials) {
     const bom_raw_materials = await Promise.all(
       raw_materials.map(async (material) => {
-        const isExistingMaterial = await Product.findById(material.item);
         const createdMaterial = await BOMRawMaterial.create({
           ...material,
           bom: bom._id,
         });
 
-        // Store shortages in InventoryShortage collection
         const shortage = shortages.find(s => s.item.toString() === material.item.toString());
         if (shortage) {
           await InventoryShortage.create({
@@ -141,11 +147,9 @@ exports.create = TryCatch(async (req, res) => {
     await bom.save();
   }
 
-  let bom_scrap_materials;
   if (scrap_materials) {
-    bom_scrap_materials = await Promise.all(
+    const bom_scrap_materials = await Promise.all(
       scrap_materials.map(async (material) => {
-        const isExistingMaterial = await Product.findById(material.item);
         const createdMaterial = await BOMScrapMaterial.create({
           ...material,
           bom: bom._id,
@@ -166,27 +170,6 @@ exports.create = TryCatch(async (req, res) => {
       bom,
     });
   }
-  // await Promise.all(
-  //   raw_materials.map(async (material) => {
-  //     const product = await Product.findById(material.item);
-  //     if (product) {
-  //       product.current_stock =
-  //         (product.current_stock || 0) - material.quantity;
-  //       product.change_type = "decrease";
-  //       product.quantity_changed = material.quantity;
-  //       await product.save();
-  //     }
-
-  //   })
-  // );
-  // const finishedProduct = await Product.findById(finished_good.item);
-  // if (finishedProduct) {
-  //   finishedProduct.current_stock =
-  //     (finishedProduct.current_stock || 0) + finished_good.quantity;
-  //   finishedProduct.change_type = "increase";
-  //   finishedProduct.quantity_changed = finished_good.quantity;
-  //   await finishedProduct.save();
-  // }
 
   res.status(200).json({
     status: 200,
@@ -195,6 +178,7 @@ exports.create = TryCatch(async (req, res) => {
     bom,
   });
 });
+
 
 exports.update = TryCatch(async (req, res) => {
   const { id } = req.params;
@@ -210,37 +194,19 @@ exports.update = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-    manpower,
+    manpower // <-- raw manpower from request
   } = req.body;
+
   if (!id) {
     throw new ErrorHandler("id not provided", 400);
   }
+
   const bom = await BOM.findById(id)
     .populate("approved_by")
-    .populate({
-      path: "finished_good",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
-    })
-    .populate({
-      path: "raw_materials",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
-    })
-    .populate({
-      path: "scrap_materials",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
-    });
+    .populate({ path: "finished_good", populate: { path: "item" } })
+    .populate({ path: "raw_materials", populate: { path: "item" } })
+    .populate({ path: "scrap_materials", populate: { path: "item" } });
+
   if (!bom) {
     throw new ErrorHandler("BOM not found", 400);
   }
@@ -281,9 +247,7 @@ exports.update = TryCatch(async (req, res) => {
   if (scrap_materials) {
     await Promise.all(
       scrap_materials.map(async (material) => {
-        const isScrapMaterialExists = await BOMScrapMaterial.findById(
-          material._id
-        );
+        const isScrapMaterialExists = await BOMScrapMaterial.findById(material._id);
         if (isScrapMaterialExists) {
           const isProdExists = await Product.findById(material.item);
           if (!isProdExists) {
@@ -300,86 +264,46 @@ exports.update = TryCatch(async (req, res) => {
       bom.finished_good.item = finished_good.item;
     }
 
-    // Calculate the increase in finished good quantity based on negative raw material quantities
     const totalRawMaterialDecrease = raw_materials
-      ? raw_materials
-          .filter(material => material.quantity < 0)
-          .reduce((sum, material) => sum + Math.abs(material.quantity), 0)
+      ? raw_materials.filter(material => material.quantity < 0)
+        .reduce((sum, material) => sum + Math.abs(material.quantity), 0)
       : 0;
 
     const adjustedFinishedGoodQuantity = finished_good.quantity + totalRawMaterialDecrease;
 
     bom.finished_good.quantity = adjustedFinishedGoodQuantity;
-
-    await isProdExists.save();
-
     bom.finished_good.cost = finished_good.cost;
     bom.finished_good.comments = finished_good?.comments;
     bom.finished_good.description = finished_good?.description;
     bom.finished_good.supporting_doc = finished_good?.supporting_doc;
+
+    await isProdExists.save();
   }
 
   if (raw_materials) {
     await Promise.all(
       raw_materials.map(async (material) => {
-        try {
-          const isExistingRawMaterial = await BOMRawMaterial.findById(
-            material._id
-          );
-          const isProdExists = await Product.findById(material.item);
+        const isExistingRawMaterial = await BOMRawMaterial.findById(material._id);
+        if (isExistingRawMaterial) {
+          isExistingRawMaterial.item = material.item;
+          isExistingRawMaterial.description = material?.description;
+          isExistingRawMaterial.quantity = material.quantity;
+          isExistingRawMaterial.assembly_phase = material?.assembly_phase;
+          isExistingRawMaterial.supporting_doc = material?.supporting_doc;
+          isExistingRawMaterial.comments = material?.comments;
+          isExistingRawMaterial.total_part_cost = material?.total_part_cost;
+          await isExistingRawMaterial.save();
 
-          if (!isProdExists) {
-            throw new Error(`Product with ID ${material.item} does not exist.`);
-          }
-
-          if (isExistingRawMaterial) {
-            if (isExistingRawMaterial.item.toString() !== material.item) {
-              isExistingRawMaterial.item = material.item;
-            }
-
-            isExistingRawMaterial.description = material?.description;
-            isExistingRawMaterial.quantity = material.quantity;
-            isExistingRawMaterial.assembly_phase = material?.assembly_phase;
-            isExistingRawMaterial.supporting_doc = material?.supporting_doc;
-            isExistingRawMaterial.comments = material?.comments;
-            isExistingRawMaterial.total_part_cost = material?.total_part_cost;
-
-            await isExistingRawMaterial.save();
-
-            // Update or create shortage record
-            const shortage = shortages.find(s => s.item.toString() === material.item.toString());
-            if (shortage) {
-              await InventoryShortage.findOneAndUpdate(
-                { bom: bom._id, raw_material: material._id },
-                { shortage_quantity: shortage.shortage_quantity },
-                { upsert: true, new: true }
-              );
-            } else {
-              await InventoryShortage.deleteOne({ bom: bom._id, raw_material: material._id });
-            }
+          const shortage = shortages.find(s => s.item.toString() === material.item.toString());
+          if (shortage) {
+            await InventoryShortage.findOneAndUpdate(
+              { bom: bom._id, raw_material: material._id },
+              { shortage_quantity: shortage.shortage_quantity },
+              { upsert: true, new: true }
+            );
           } else {
-            const newRawMaterial = await BOMRawMaterial.create({
-              ...material,
-              bom: bom._id,
-            });
-            bom.raw_materials.push(newRawMaterial._id);
-
-            // Store new shortage if applicable
-            const shortage = shortages.find(s => s.item.toString() === material.item.toString());
-            if (shortage) {
-              await InventoryShortage.create({
-                bom: bom._id,
-                raw_material: newRawMaterial._id,
-                item: material.item,
-                shortage_quantity: shortage.shortage_quantity,
-              });
-            }
+            await InventoryShortage.deleteOne({ bom: bom._id, raw_material: material._id });
           }
-        } catch (error) {
-          console.error(
-            `Error processing raw material ${material._id}:`,
-            error
-          );
         }
       })
     );
@@ -388,38 +312,13 @@ exports.update = TryCatch(async (req, res) => {
   if (scrap_materials) {
     await Promise.all(
       scrap_materials.map(async (material) => {
-        try {
-          const isExistingScrapMaterial = await BOMScrapMaterial.findById(
-            material._id
-          );
-          const isProdExists = await Product.findById(material.item);
-
-          if (!isProdExists) {
-            throw new Error(`Product with ID ${material.item} does not exist.`);
-          }
-
-          if (isExistingScrapMaterial) {
-            if (isExistingScrapMaterial.item.toString() !== material.item) {
-              isExistingScrapMaterial.item = material.item;
-            }
-
-            isExistingScrapMaterial.description = material?.description;
-            isExistingScrapMaterial.quantity = material.quantity;
-            isExistingScrapMaterial.total_part_cost = material?.total_part_cost;
-
-            await isExistingScrapMaterial.save();
-          } else {
-            const newScrapMaterial = await BOMScrapMaterial.create({
-              ...material,
-              bom: bom._id,
-            });
-            bom.scrap_materials.push(newScrapMaterial._id);
-          }
-        } catch (error) {
-          console.error(
-            `Error processing scrap material ${material._id}:`,
-            error
-          );
+        const isExistingScrapMaterial = await BOMScrapMaterial.findById(material._id);
+        if (isExistingScrapMaterial) {
+          isExistingScrapMaterial.item = material.item;
+          isExistingScrapMaterial.description = material?.description;
+          isExistingScrapMaterial.quantity = material.quantity;
+          isExistingScrapMaterial.total_part_cost = material?.total_part_cost;
+          await isExistingScrapMaterial.save();
         }
       })
     );
@@ -431,19 +330,24 @@ exports.update = TryCatch(async (req, res) => {
   if (typeof remarks === "string") {
     bom.remarks = remarks.trim();
   }
+
+ 
   if (Array.isArray(manpower)) {
-    // Validate each manpower entry has a user
-    const validManpower = manpower.filter((mp) => mp.user);
-    bom.manpower = validManpower;
+    const manpowerData = manpower.map(mp => ({
+      user: mp.user || null,
+      number: String(mp.number ?? "0")
+    }));
+    bom.manpower = manpowerData;
   }
+
   if (Array.isArray(resources)) {
     const validResources = resources.filter((res) => res.resource_id);
     bom.resources = validResources;
   }
 
-  bom_name && bom_name.trim().length > 0 && (bom.bom_name = bom_name);
-  parts_count && parts_count > 0 && (bom.parts_count = parts_count);
-  total_cost && (bom.total_cost = total_cost);
+  if (bom_name && bom_name.trim().length > 0) bom.bom_name = bom_name;
+  if (parts_count && parts_count > 0) bom.parts_count = parts_count;
+  if (total_cost) bom.total_cost = total_cost;
   if (approved && req.user.isSuper) {
     bom.approved_by = req.user._id;
     bom.approved = true;
@@ -451,54 +355,6 @@ exports.update = TryCatch(async (req, res) => {
 
   await bom.finished_good.save();
   await bom.save();
-
-  if (bom.production_process) {
-    const productionProcess = await ProductionProcess.findById(
-      bom.production_process
-    )
-      .populate({
-        path: "finished_good",
-        populate: { path: "item" },
-      })
-      .populate({
-        path: "raw_materials",
-        populate: [
-          {
-            path: "item",
-          },
-        ],
-      })
-      .populate({
-        path: "scrap_materials",
-        populate: [
-          {
-            path: "item",
-          },
-        ],
-      });
-
-    productionProcess.raw_materials.forEach((rm) => {
-      const matchingMaterial = bom.raw_materials.find(
-        (m) => m.item._id.toString() === rm.item._id.toString()
-      );
-      if (matchingMaterial) {
-        rm.estimated_quantity = matchingMaterial.quantity;
-      }
-    });
-    productionProcess.scrap_materials.forEach((sc) => {
-      const matchingMaterial = bom.scrap_materials.find(
-        (m) => m.item._id.toString() === sc.item._id.toString()
-      );
-      if (matchingMaterial) {
-        sc.estimated_quantity = matchingMaterial.quantity;
-      }
-    });
-
-    productionProcess.finished_good.estimated_quantity =
-      bom.finished_good.quantity;
-
-    await productionProcess.save();
-  }
 
   if (insuffientStockMsg) {
     return res.status(400).json({
@@ -514,6 +370,7 @@ exports.update = TryCatch(async (req, res) => {
     message: "BOM has been updated successfully",
   });
 });
+
 
 exports.remove = TryCatch(async (req, res) => {
   const { id } = req.params;
@@ -554,53 +411,36 @@ exports.details = TryCatch(async (req, res) => {
     })
     .populate({
       path: "raw_materials",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
+      populate: [{ path: "item" }],
     })
     .populate({
       path: "scrap_materials",
-      populate: [
-        {
-          path: "item",
-        },
-      ],
+      populate: [{ path: "item" }],
     })
-    .populate({
-      path: "manpower",
-      populate: [
-        {
-          path: "user"
-        }
-      ]
-    })
+ 
     .populate({
       path: "resources.resource_id",
       model: "Resource"
-    })
-
+    });
 
   if (!bom) {
     throw new ErrorHandler("BOM not found", 400);
   }
+
   res.status(200).json({
     status: 200,
     success: true,
     bom,
   });
 });
+
 exports.all = TryCatch(async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 100;
   const skip = (page - 1) * limit;
 
   const boms = await BOM.find({ approved: true })
-    .populate({
-      path: "manpower.user",
-      select: "first_name last_name email phone employeeId role",
-    })
+  
 
     .populate({
       path: "finished_good",
