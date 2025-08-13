@@ -40,7 +40,7 @@ const productionProcessSchema = new Schema(
       enum: [
         "raw material approval pending",
         "raw materials approved",
-        "work in progress",
+        "production in progress",
         "completed",
         "inventory allocated",//new
         "request for allow inventory",//new
