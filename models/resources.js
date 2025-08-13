@@ -1,5 +1,10 @@
 const { Schema, model } = require("mongoose");
 
+const capitalizeFirstLetter = (str) =>
+  typeof str === "string" && str.length > 0
+    ? str.charAt(0).toUpperCase() + str.slice(1)
+    : str;
+
 const resourcesSchema = new Schema(
   {
     name: {
@@ -20,13 +25,26 @@ const resourcesSchema = new Schema(
     customId: {
       type: String,
       required: true,
-      unique: true, // Important to prevent duplicates like "customer-feedback-001"
+      unique: true,
     },
   },
   {
     timestamps: true,
   }
 );
+
+resourcesSchema.set("toJSON", {
+  transform: function (doc, ret) {
+    for (let key in ret) {
+      if (typeof ret[key] === "string") {
+        ret[key] = capitalizeFirstLetter(ret[key]);
+      } else if (Array.isArray(ret[key])) {
+        ret[key] = ret[key].map((item) => capitalizeFirstLetter(item));
+      }
+    }
+    return ret;
+  },
+});
 
 const Resource = model("Resource", resourcesSchema);
 module.exports = Resource;
