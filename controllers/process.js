@@ -195,20 +195,19 @@ exports.update = async (req, res) => {
     );
   }
 
-  // Update process steps
   if (Array.isArray(bom?.processes)) {
     productionProcess.processes.forEach((step) => {
       const incoming = bom.processes.find((p) => p.process === step.process);
       if (incoming) {
         step.start = incoming.start ?? step.start;
         step.done = incoming.done ?? step.done;
+        step.work_done = incoming.work_done ?? step.work_done; // <-- save work done
+        step.work_left = incoming.work_left ?? step.work_left; // <-- save work left
       }
     });
-    // console.log("Incoming process update:", bom.processes);
-    // console.log("Existing process state before update:", productionProcess.processes);
-
     productionProcess.markModified("processes");
   }
+
 
   productionProcess.status = status;
 
@@ -450,7 +449,7 @@ exports.startProduction = async (req, res) => {
     });
   }
 };
- // yeeeee
+// yeeeee
 
 
 exports.markDone = TryCatch(async (req, res) => {
