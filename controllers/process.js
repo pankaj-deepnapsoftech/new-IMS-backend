@@ -84,8 +84,38 @@ exports.update = async (req, res) => {
     throw new ErrorHandler("Production Process doesn't exist", 400);
   }
 
-  if (status === "production start") { //new
+  // ✅ Always update quantities, even if status != "production start"
+  if (bom?.finished_good) {
+    productionProcess.finished_good.produced_quantity =
+      bom.finished_good.produced_quantity ?? productionProcess.finished_good.produced_quantity;
+  }
 
+  if (Array.isArray(bom?.raw_materials)) {
+    productionProcess.raw_materials.forEach((prevRm) => {
+      const currRm = bom.raw_materials.find(
+        (item) => (item?.item + "") === (prevRm?.item + "")
+      );
+      if (currRm) {
+        prevRm.used_quantity =
+          currRm.used_quantity ?? prevRm.used_quantity;
+      }
+    });
+  }
+
+  if (Array.isArray(bom?.scrap_materials)) {
+    productionProcess.scrap_materials.forEach((prevSc) => {
+      const currSc = bom.scrap_materials.find(
+        (item) => (item?.item + "") === (prevSc?.item + "")
+      );
+      if (currSc) {
+        prevSc.produced_quantity =
+          currSc.produced_quantity ?? prevSc.produced_quantity;
+      }
+    });
+  }
+
+  // ✅ Stock adjustment logic when starting production
+  if (status === "production start") {
     // FINISHED GOOD
     const prevFG = productionProcess.finished_good;
     const currFG = bom.finished_good;
@@ -100,13 +130,11 @@ exports.update = async (req, res) => {
         fgProduct.current_stock += change;
         fgProduct.change_type = "increase";
         fgProduct.quantity_changed = change;
-        prevFG.produced_quantity += change;
       } else if (prevQty > newQty) {
         const change = prevQty - newQty;
         fgProduct.current_stock -= change;
         fgProduct.change_type = "decrease";
         fgProduct.quantity_changed = change;
-        prevFG.produced_quantity -= change;
       }
 
       await fgProduct.save();
@@ -120,8 +148,7 @@ exports.update = async (req, res) => {
       prevRMs.map(async (prevRm) => {
         const rawProduct = await Product.findById(prevRm.item);
         const currRm = currRMs.find(
-          (item) =>
-            (item?.item + "") === (prevRm?.item + "")
+          (item) => (item?.item + "") === (prevRm?.item + "")
         );
 
         if (!currRm || !rawProduct) return;
@@ -134,13 +161,11 @@ exports.update = async (req, res) => {
           rawProduct.current_stock -= change;
           rawProduct.change_type = "decrease";
           rawProduct.quantity_changed = change;
-          prevRm.used_quantity += change;
         } else if (prevQty > newQty) {
           const change = prevQty - newQty;
           rawProduct.current_stock += change;
           rawProduct.change_type = "increase";
           rawProduct.quantity_changed = change;
-          prevRm.used_quantity -= change;
         }
 
         const bomRm = await BOMRawMaterial.findById(currRm._id);
@@ -161,8 +186,7 @@ exports.update = async (req, res) => {
       prevSCs.map(async (prevSc) => {
         const scrapProduct = await Product.findById(prevSc.item);
         const currSc = currSCs.find(
-          (item) =>
-            (item?.item + "") === (prevSc?.item + "")
+          (item) => (item?.item + "") === (prevSc?.item + "")
         );
 
         if (!currSc || !scrapProduct) return;
@@ -175,13 +199,11 @@ exports.update = async (req, res) => {
           scrapProduct.current_stock -= change;
           scrapProduct.change_type = "decrease";
           scrapProduct.quantity_changed = change;
-          prevSc.produced_quantity += change;
         } else if (prevQty > newQty) {
           const change = prevQty - newQty;
           scrapProduct.current_stock += change;
           scrapProduct.change_type = "increase";
           scrapProduct.quantity_changed = change;
-          prevSc.produced_quantity -= change;
         }
 
         const bomSc = await BOMScrapMaterial.findById(currSc._id);
@@ -195,24 +217,30 @@ exports.update = async (req, res) => {
     );
   }
 
-  // Update process steps
+  // ✅ Processes update
   if (Array.isArray(bom?.processes)) {
     productionProcess.processes.forEach((step) => {
       const incoming = bom.processes.find((p) => p.process === step.process);
       if (incoming) {
         step.start = incoming.start ?? step.start;
         step.done = incoming.done ?? step.done;
+        step.work_done = incoming.work_done ?? step.work_done;
+        step.work_left = incoming.work_left ?? step.work_left;
       }
     });
-    // console.log("Incoming process update:", bom.processes);
-    // console.log("Existing process state before update:", productionProcess.processes);
-
     productionProcess.markModified("processes");
   }
 
-  productionProcess.status = status;
+  // ✅ Status update
+  if (
+    productionProcess.status !== "production started" &&
+    typeof status === "string" &&
+    status.trim() !== ""
+  ) {
+    productionProcess.status = status;
+  }
 
-  // Mark nested updates
+  // ✅ Mark nested updates
   productionProcess.markModified("finished_good");
   productionProcess.markModified("raw_materials");
   productionProcess.markModified("scrap_materials");
@@ -225,6 +253,7 @@ exports.update = async (req, res) => {
     message: "Production process updated successfully",
   });
 };
+
 
 exports.remove = TryCatch(async (req, res) => {
   const { _id } = req.params;
@@ -450,7 +479,7 @@ exports.startProduction = async (req, res) => {
     });
   }
 };
- // yeeeee
+// yeeeee
 
 
 exports.markDone = TryCatch(async (req, res) => {
