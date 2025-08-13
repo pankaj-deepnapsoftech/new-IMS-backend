@@ -968,6 +968,8 @@ exports.updateInventory = TryCatch(async (req, res) => {
 exports.updatePrice = TryCatch(async (req, res) => {
   const { productId, newPrice } = req.body;
 
+  console.log("updatePrice called with:", { productId, newPrice });
+
   if (!productId || newPrice === undefined) {
     throw new ErrorHandler("Please provide productId and newPrice", 400);
   }
@@ -977,6 +979,12 @@ exports.updatePrice = TryCatch(async (req, res) => {
   if (!product) {
     throw new ErrorHandler("Product doesn't exist", 400);
   }
+
+  console.log("Found product for price update:", {
+    name: product.name,
+    currentPrice: product.price,
+    newPrice: newPrice
+  });
 
   const currentPrice = product.price || 0;
   const updatedPrice = Number(newPrice); // The price entered by user
@@ -992,21 +1000,28 @@ exports.updatePrice = TryCatch(async (req, res) => {
     { new: true }
   );
 
+  console.log("Product updated successfully:", {
+    name: updatedProduct.name,
+    currentPrice: updatedProduct.price,
+    updatedPrice: updatedProduct.updated_price
+  });
+
   res.status(200).json({
     status: 200,
     success: true,
-    message: "Price updated successfully",
+    message: "Updated price saved successfully",
     product: updatedProduct,
-    currentPrice: currentPrice, // Current price before update
-    updatedPrice: updatedPrice, // Price entered by user
-    finalPrice: finalPrice, // Final price after update
-    priceDifference: finalPrice - currentPrice,
+    currentPrice: currentPrice, // Original price remains unchanged
+    updatedPrice: updatedPrice, // New updated price
+    priceDifference: updatedPrice - currentPrice,
     currentStock: currentStock // Current stock information
   });
 });
 
 exports.updateStock = TryCatch(async (req, res) => {
   const { productId, newStock } = req.body;
+
+  console.log("updateStock called with:", { productId, newStock });
 
   if (!productId || newStock === undefined) {
     throw new ErrorHandler("Please provide productId and newStock", 400);
@@ -1018,18 +1033,29 @@ exports.updateStock = TryCatch(async (req, res) => {
     throw new ErrorHandler("Product doesn't exist", 400);
   }
 
+  console.log("Found product for stock update:", {
+    name: product.name,
+    currentStock: product.current_stock,
+    newStock: newStock
+  });
+
   const currentStock = product.current_stock || 0;
   const updatedStock = Number(newStock); // The stock entered by user
-  const finalStock = currentStock + updatedStock; // Final stock = current stock + updated stock
 
-  // Update the product stock
+  // Update the product with new updated_stock field instead of replacing current_stock
   const updatedProduct = await Product.findByIdAndUpdate(
     productId,
     {
-      current_stock: finalStock,
+      updated_stock: updatedStock, // Store updated stock in new field
     },
     { new: true }
   );
+
+  console.log("Product updated successfully:", {
+    name: updatedProduct.name,
+    currentStock: updatedProduct.current_stock,
+    updatedStock: updatedProduct.updated_stock
+  });
 
   res.status(200).json({
     status: 200,
@@ -1113,6 +1139,8 @@ exports.clearUpdatedStock = TryCatch(async (req, res) => {
 exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
   const { productId } = req.body;
 
+  console.log("removeFromInventoryShortages called with productId:", productId);
+
   if (!productId) {
     throw new ErrorHandler("Please provide productId", 400);
   }
@@ -1123,9 +1151,17 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
     throw new ErrorHandler("Product doesn't exist", 400);
   }
 
+  console.log("Found product:", {
+    name: product.name,
+    updated_stock: product.updated_stock,
+    updated_price: product.updated_price
+  });
+
   // Check if product has been updated (has updated_stock or updated_price)
   const hasUpdates = (product.updated_stock && product.updated_stock !== null) || 
                     (product.updated_price && product.updated_price !== null);
+
+  console.log("Has updates:", hasUpdates);
 
   if (!hasUpdates) {
     throw new ErrorHandler("Product has no updates to process", 400);
@@ -1134,10 +1170,16 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
   // Import InventoryShortage model
   const InventoryShortage = require("../models/inventoryShortage");
 
+  // Find shortages before deletion for debugging
+  const shortagesBefore = await InventoryShortage.find({ item: productId });
+  console.log("Shortages found before deletion:", shortagesBefore.length);
+
   // Remove all inventory shortages for this product
   const deleteResult = await InventoryShortage.deleteMany({
     item: productId
   });
+
+  console.log("Delete result:", deleteResult);
 
   res.status(200).json({
     status: 200,
@@ -1145,6 +1187,7 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
     message: "Product removed from inventory shortages successfully",
     product: product,
     deletedShortages: deleteResult.deletedCount,
-    hasUpdates: hasUpdates
+    hasUpdates: hasUpdates,
+    shortagesBefore: shortagesBefore.length
   });
 });
