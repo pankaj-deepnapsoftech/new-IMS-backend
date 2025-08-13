@@ -83,7 +83,6 @@ exports.update = async (req, res) => {
   if (!productionProcess) {
     throw new ErrorHandler("Production Process doesn't exist", 400);
   }
-
   if (status === "production start") { //new
 
     // FINISHED GOOD
@@ -210,13 +209,15 @@ exports.update = async (req, res) => {
     productionProcess.markModified("processes");
   }
 
-  productionProcess.status = status;
+  if (productionProcess.status !== "production started" && typeof status === "string" && status.trim() !== "") {
+    productionProcess.status = status;
+  }
 
   // Mark nested updates
   productionProcess.markModified("finished_good");
   productionProcess.markModified("raw_materials");
   productionProcess.markModified("scrap_materials");
-
+  console.log("production process status",productionProcess)
   await productionProcess.save();
 
   return res.status(200).json({
