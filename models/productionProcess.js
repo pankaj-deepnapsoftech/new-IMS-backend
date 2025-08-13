@@ -21,7 +21,7 @@ const productionProcessSchema = new Schema(
       type: Number,
       required: [true, "Quantity is a required field"],
     },
-    rm_store: {
+    rm_store: { 
       type: Schema.Types.ObjectId,
       ref: "Store",
       required: [true, "Raw material store is a required field"],
@@ -69,6 +69,10 @@ const productionProcessSchema = new Schema(
           done: {
             type: Boolean,
             default: false,
+          },
+          work_done: {
+            type: Number,
+            default: 0, 
           },
         },
       ],
