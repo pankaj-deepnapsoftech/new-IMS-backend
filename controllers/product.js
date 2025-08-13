@@ -87,6 +87,32 @@ exports.remove = TryCatch(async (req, res) => {
     product,
   });
 });
+
+exports.bulkDelete = TryCatch(async (req, res) => {
+  const { productIds } = req.body;
+
+  if (!productIds || !Array.isArray(productIds) || productIds.length === 0) {
+    throw new ErrorHandler("Please provide an array of product IDs", 400);
+  }
+
+  // Delete all products with the provided IDs
+  const deleteResult = await Product.deleteMany({
+    _id: { $in: productIds },
+  });
+
+  if (deleteResult.deletedCount === 0) {
+    throw new ErrorHandler("No products were found to delete", 400);
+  }
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: `Successfully deleted ${deleteResult.deletedCount} product${
+      deleteResult.deletedCount > 1 ? "s" : ""
+    }`,
+    deletedCount: deleteResult.deletedCount,
+  });
+});
 exports.details = TryCatch(async (req, res) => {
   const { id } = req.params;
   const product = await Product.findById(id).populate("store");
@@ -926,16 +952,16 @@ exports.updateInventory = TryCatch(async (req, res) => {
   if (!product) {
     throw new ErrorHandler("Product doesn't exist", 400);
   }
-  
 
   // Calculate new stock and average price
   const currentStock = product.current_stock || 0;
   const currentPrice = product.price || 0;
   const updatedPrice = Number(newPrice); // The price entered by user
-  
-  const totalValue = (currentStock * currentPrice) + (buyQuantity * updatedPrice);
+
+  const totalValue = currentStock * currentPrice + buyQuantity * updatedPrice;
   const newTotalStock = currentStock + buyQuantity;
-  const finalPrice = newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : updatedPrice;
+  const finalPrice =
+    newTotalStock > 0 ? Math.round(totalValue / newTotalStock) : updatedPrice;
 
   // Update the product
   const updatedProduct = await Product.findByIdAndUpdate(
@@ -983,7 +1009,7 @@ exports.updatePrice = TryCatch(async (req, res) => {
   console.log("Found product for price update:", {
     name: product.name,
     currentPrice: product.price,
-    newPrice: newPrice
+    newPrice: newPrice,
   });
 
   const currentPrice = product.price || 0;
@@ -1003,7 +1029,7 @@ exports.updatePrice = TryCatch(async (req, res) => {
   console.log("Product updated successfully:", {
     name: updatedProduct.name,
     currentPrice: updatedProduct.price,
-    updatedPrice: updatedProduct.updated_price
+    updatedPrice: updatedProduct.updated_price,
   });
 
   res.status(200).json({
@@ -1014,7 +1040,7 @@ exports.updatePrice = TryCatch(async (req, res) => {
     currentPrice: currentPrice, // Original price remains unchanged
     updatedPrice: updatedPrice, // New updated price
     priceDifference: updatedPrice - currentPrice,
-    currentStock: currentStock // Current stock information
+    currentStock: currentStock, // Current stock information
   });
 });
 
@@ -1036,7 +1062,7 @@ exports.updateStock = TryCatch(async (req, res) => {
   console.log("Found product for stock update:", {
     name: product.name,
     currentStock: product.current_stock,
-    newStock: newStock
+    newStock: newStock,
   });
 
   const currentStock = product.current_stock || 0;
@@ -1054,7 +1080,7 @@ exports.updateStock = TryCatch(async (req, res) => {
   console.log("Product updated successfully:", {
     name: updatedProduct.name,
     currentStock: updatedProduct.current_stock,
-    updatedStock: updatedProduct.updated_stock
+    updatedStock: updatedProduct.updated_stock,
   });
 
   res.status(200).json({
@@ -1065,7 +1091,7 @@ exports.updateStock = TryCatch(async (req, res) => {
     currentStock: currentStock, // Original stock remains unchanged
     updatedStock: updatedStock, // New updated stock
     totalAvailableStock: currentStock + updatedStock, // Total available stock
-    stockDifference: updatedStock
+    stockDifference: updatedStock,
   });
 });
 
@@ -1098,7 +1124,7 @@ exports.clearUpdatedPrice = TryCatch(async (req, res) => {
     message: "Updated price cleared successfully",
     product: updatedProduct,
     currentPrice: product.price,
-    clearedUpdatedPrice: product.updated_price
+    clearedUpdatedPrice: product.updated_price,
   });
 });
 
@@ -1131,7 +1157,7 @@ exports.clearUpdatedStock = TryCatch(async (req, res) => {
     message: "Updated stock cleared successfully",
     product: updatedProduct,
     currentStock: product.current_stock,
-    clearedUpdatedStock: product.updated_stock
+    clearedUpdatedStock: product.updated_stock,
   });
 });
 
@@ -1154,12 +1180,13 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
   console.log("Found product:", {
     name: product.name,
     updated_stock: product.updated_stock,
-    updated_price: product.updated_price
+    updated_price: product.updated_price,
   });
 
   // Check if product has been updated (has updated_stock or updated_price)
-  const hasUpdates = (product.updated_stock && product.updated_stock !== null) || 
-                    (product.updated_price && product.updated_price !== null);
+  const hasUpdates =
+    (product.updated_stock && product.updated_stock !== null) ||
+    (product.updated_price && product.updated_price !== null);
 
   console.log("Has updates:", hasUpdates);
 
@@ -1176,7 +1203,7 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
 
   // Remove all inventory shortages for this product
   const deleteResult = await InventoryShortage.deleteMany({
-    item: productId
+    item: productId,
   });
 
   console.log("Delete result:", deleteResult);
@@ -1188,6 +1215,6 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
     product: product,
     deletedShortages: deleteResult.deletedCount,
     hasUpdates: hasUpdates,
-    shortagesBefore: shortagesBefore.length
+    shortagesBefore: shortagesBefore.length,
   });
 });
