@@ -9,6 +9,27 @@ exports.create = TryCatch(async (req, res) => {
     throw new ErrorHandler("Please provide all the fields", 400);
   }
 
+  // Validate required fields
+  const requiredFields = [
+    "supplierName",
+    "itemName",
+    "quantity",
+    "supplierType",
+  ];
+  for (const field of requiredFields) {
+    if (!purchaseOrder[field]) {
+      throw new ErrorHandler(`${field} is required`, 400);
+    }
+  }
+
+  // Validate supplier type
+  if (!["Individual", "Company"].includes(purchaseOrder.supplierType)) {
+    throw new ErrorHandler(
+      "Supplier type must be either 'Individual' or 'Company'",
+      400
+    );
+  }
+
   // Generate automatic PO number
   const poNumber = await generatePONumber();
 
@@ -28,7 +49,7 @@ exports.create = TryCatch(async (req, res) => {
 
 exports.getNextPONumber = TryCatch(async (req, res) => {
   const poNumber = await generatePONumber();
-  
+
   res.status(200).json({
     status: 200,
     success: true,
@@ -45,6 +66,7 @@ exports.allSuppliers = TryCatch(async (req, res) => {
       cust_id: 1,
       consignee_name: 1,
       company_name: 1,
+      type: 1,
       shipped_to: 1,
       bill_to: 1,
       shipped_gst_to: 1,
@@ -62,6 +84,7 @@ exports.allSuppliers = TryCatch(async (req, res) => {
       ? supplier.consignee_name[0]
       : supplier.consignee_name || "",
     companyName: supplier.company_name || "",
+    supplierType: supplier.type || "Individual",
 
     supplierShippedTo: supplier.shipped_to || "",
     supplierBillTo: supplier.bill_to || "",
@@ -74,7 +97,6 @@ exports.allSuppliers = TryCatch(async (req, res) => {
     supplierEmail: Array.isArray(supplier.email_id)
       ? supplier.email_id[0]
       : supplier.email_id || "",
- 
 
     // companyPhoneNumber: Array.isArray(supplier.contact_number)
     //   ? supplier.contact_number[0]
@@ -89,9 +111,6 @@ exports.allSuppliers = TryCatch(async (req, res) => {
   });
 });
 
-
-
-
 exports.update = TryCatch(async (req, res) => {
   const { _id } = req.params;
   if (!_id) {
@@ -102,13 +121,28 @@ exports.update = TryCatch(async (req, res) => {
     throw new ErrorHandler("Please provide all the fields", 400);
   }
 
+  // Validate supplier type if provided
+  if (
+    purchaseOrder.supplierType &&
+    !["Individual", "Company"].includes(purchaseOrder.supplierType)
+  ) {
+    throw new ErrorHandler(
+      "Supplier type must be either 'Individual' or 'Company'",
+      400
+    );
+  }
+
   const updatedPurchaseOrder = await PurchaseOrder.findByIdAndUpdate(
     { _id: _id },
     {
-      $set: { ...purchaseOrder, items: purchaseOrder.items },
+      $set: { ...purchaseOrder },
     },
     { new: true }
   );
+
+  if (!updatedPurchaseOrder) {
+    throw new ErrorHandler("Purchase Order not found", 404);
+  }
 
   res.status(200).json({
     status: 200,
@@ -134,6 +168,36 @@ exports.remove = TryCatch(async (req, res) => {
     status: 200,
     success: true,
     message: "Purchase Order deleted successfully",
+  });
+});
+
+exports.bulkDelete = TryCatch(async (req, res) => {
+  const { ids } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    throw new ErrorHandler(
+      "Please provide an array of Purchase Order IDs",
+      400
+    );
+  }
+
+  // Validate all IDs exist
+  const existingPurchaseOrders = await PurchaseOrder.find({
+    _id: { $in: ids },
+  });
+
+  if (existingPurchaseOrders.length !== ids.length) {
+    throw new ErrorHandler("One or more Purchase Orders not found", 400);
+  }
+
+  // Delete all purchase orders
+  const deleteResult = await PurchaseOrder.deleteMany({ _id: { $in: ids } });
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: `${deleteResult.deletedCount} Purchase Order(s) deleted successfully`,
+    deletedCount: deleteResult.deletedCount,
   });
 });
 

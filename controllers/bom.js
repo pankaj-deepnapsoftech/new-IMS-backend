@@ -972,6 +972,80 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
     unapproved: results,
   });
 });
+// Get all finished goods for inventory
+// exports.allFinishedGoodsForInventory = TryCatch(async (req, res) => {
+//   const allFinishedGoods = await BOMFinishedMaterial.find()
+//     .populate("item") // product details
+//     .populate({
+//       path: "bom",
+//       select: "bom_name production_process",
+//     });
+
+//   const results = [];
+
+//   for (const fg of allFinishedGoods) {
+//     const bom = fg.bom;
+//     if (!bom || !bom.production_process) continue;
+
+//     const productionProcess = await ProductionProcess.findById(bom.production_process);
+//     if (!productionProcess) continue;
+
+//     const item = fg.item;
+
+//     results.push({
+//       _id: fg._id,
+//       bom_id: bom._id,
+//       bom_name: bom.bom_name,
+//       bom_status: productionProcess.status,
+//       production_process_id: productionProcess._id,
+//       product_id: item?.product_id,
+//       name: item?.name,
+//       uom: item?.uom,
+//       current_stock: item?.current_stock,
+//       price: item?.price,
+//       createdAt: fg.createdAt,
+//       updatedAt: fg.updatedAt,
+//       quantity: fg.quantity,
+//       isInventoryReceived: fg.isInventoryReceived || false
+//     });
+//   }
+
+//   res.status(200).json({
+//     status: 200,
+//     success: true,
+//     unapproved: results,
+//   });
+// });
+
+
+// // Approve / Move finished good to inventory
+// exports.approveFinishedGood = TryCatch(async (req, res) => {
+//   const { _id } = req.body;
+//   if (!_id) throw new ErrorHandler("Finished good id not provided", 400);
+
+//   const updatedFG = await BOMFinishedMaterial.findByIdAndUpdate(
+//     _id,
+//     { isInventoryReceived: true },  
+//     { new: true }
+//   );
+//   if (!updatedFG) throw new ErrorHandler("Finished good not found", 404);
+
+//   // Optionally update production process status
+//   const bom = await BOM.findById(updatedFG.bom);
+//   if (bom?.production_process) {
+//     await ProductionProcess.findByIdAndUpdate(
+//       bom.production_process,
+//       { status: "Inventory Received" }
+//     );
+//   }
+
+//   res.status(200).json({
+//     status: 200,
+//     success: true,
+//     message: "Finished good moved to inventory successfully",
+//     finishedGood: updatedFG
+//   });
+// });
 
 // exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
 //   const ext = path.extname(req.file.originalname).toLowerCase();
