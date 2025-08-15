@@ -1,9 +1,9 @@
 const { Schema, model } = require("mongoose");
 
-// const capitalizeFirstLetter = (str) =>
-//   typeof str === "string" && str.length > 0
-//     ? str.charAt(0).toUpperCase() + str.slice(1)
-//     : str;
+const capitalizeFirstLetter = (str) =>
+  typeof str === "string" && str.length > 0
+    ? str.charAt(0).toUpperCase() + str.slice(1)
+    : str;
 
 const userRoleSchema = new Schema(
   {
