@@ -1,9 +1,9 @@
 const { Schema, model } = require("mongoose");
 
-const capitalizeFirstLetter = (str) =>
-  typeof str === "string" && str.length > 0
-    ? str.charAt(0).toUpperCase() + str.slice(1)
-    : str;
+// const capitalizeFirstLetter = (str) =>
+//   typeof str === "string" && str.length > 0
+//     ? str.charAt(0).toUpperCase() + str.slice(1)
+//     : str;
 
 const userRoleSchema = new Schema(
   {
@@ -48,18 +48,18 @@ const userRoleSchema = new Schema(
 );
 
 // Capitalize only the first letter of the string fields in output
-userRoleSchema.set("toJSON", {
-  transform: function (doc, ret) {
-    for (let key in ret) {
-      if (typeof ret[key] === "string") {
-        ret[key] = capitalizeFirstLetter(ret[key]);
-      } else if (Array.isArray(ret[key])) {
-        ret[key] = ret[key].map((item) => capitalizeFirstLetter(item));
-      }
-    }
-    return ret;
-  },
-});
+// userRoleSchema.set("toJSON", {
+//   transform: function (doc, ret) {
+//     for (let key in ret) {
+//       if (typeof ret[key] === "string") {
+//         ret[key] = capitalizeFirstLetter(ret[key]);
+//       } else if (Array.isArray(ret[key])) {
+//         ret[key] = ret[key].map((item) => capitalizeFirstLetter(item));
+//       }
+//     }
+//     return ret;
+//   },
+// });
 
 const UserRole = model("User-Role", userRoleSchema);
 module.exports = UserRole;
