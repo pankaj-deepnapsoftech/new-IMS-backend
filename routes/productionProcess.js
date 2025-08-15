@@ -12,7 +12,7 @@ const {
   markInventoryInTransit,
   startProduction,
   pauseProduction,
-  sendToDispatch
+  sendToDispatch,
   moveToInventory,
   getMovedToInventory,
   updateInventoryStatus,
