@@ -4,13 +4,12 @@ const { TryCatch, ErrorHandler } = require("../utils/error");
 const User = require("../models/user");
 const OTP = require("../models/otp");
 const { generateOTP } = require("../utils/generateOTP");
-const { sendEmail } = require("../utils/sendEmail"); 
+const { sendEmail } = require("../utils/sendEmail");
 
 exports.create = TryCatch(async (req, res) => {
   const userDetails = req.body;
   const totalUsers = await User.find().countDocuments();
   const nonSuperUserCount = await User.countDocuments({ isSuper: false });
-
 
   let isSuper = false;
   let employeeId = null;
@@ -125,7 +124,7 @@ exports.employeeDetails = TryCatch(async (req, res) => {
     throw new ErrorHandler("User id not found", 400);
   }
 
-  const user = await User.findById(userId);
+  const user = await User.findById(userId).populate("role");
   if (!user) {
     throw new ErrorHandler("User doesn't exist", 400);
   }

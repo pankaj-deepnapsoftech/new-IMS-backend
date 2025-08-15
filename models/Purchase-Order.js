@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
 
 const PurchaseOrderSchema = new mongoose.Schema(
   {
@@ -13,15 +13,22 @@ const PurchaseOrderSchema = new mongoose.Schema(
     poOrder: { type: String },
     date: { type: String },
     itemName: { type: String },
+    quantity: { type: Number, required: true, min: 1 },
 
     supplierName: { type: String },
     supplierCode: { type: String },
+    supplierType: {
+      type: String,
+      enum: ["Individual", "Company"],
+      default: "Individual",
+    },
     supplierPan: { type: String, required: false },
     supplierEmail: { type: String, required: false },
     supplierShippedTo: { type: String, required: false },
     supplierBillTo: { type: String, required: false },
     supplierShippedGSTIN: { type: String, required: false },
     supplierBillGSTIN: { type: String, required: false },
+    isSameAddress: { type: Boolean, default: false },
 
     GSTApply: { type: String },
     packagingAndForwarding: { type: String },
@@ -32,7 +39,7 @@ const PurchaseOrderSchema = new mongoose.Schema(
     paymentTerms: { type: String, required: false },
     additionalRemarks: { type: String, required: false },
     additionalImportant: { type: String, required: false },
-    creator: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    creator: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   {
     timestamps: true,
