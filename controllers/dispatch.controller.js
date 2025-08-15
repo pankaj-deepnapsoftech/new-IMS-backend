@@ -1,6 +1,7 @@
 const { DispatchModel } = require("../models/Dispatcher");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 const ProductionProcess = require("../models/productionProcess");
+const mongoose = require("mongoose");
 
 exports.CreateDispatch = TryCatch(async (req, res) => {
     const data = req.body;
@@ -24,41 +25,82 @@ exports.GetDispatch = TryCatch(async (req, res) => {
     const pages = parseInt(page) || 1;
     const limits = parseInt(limit) || 10;
     const skip = (pages - 1) * limits;
-    const totalData = await DispatchModel.find().countDocuments();
+
+    const totalData = await DispatchModel.countDocuments();
+
     const data = await DispatchModel.aggregate([
         {
             $lookup: {
-                from: "purchases",
-                localField: "Sale_id",
+                from: "production-processes", // actual Mongo collection name
+                localField: "production_process_id",
                 foreignField: "_id",
-                as: "Sale_id",
+                as: "production_process",
                 pipeline: [
                     {
                         $lookup: {
-                            from: "parties",
-                            localField: "party",
+                            from: "products", // finished good product
+                            localField: "finished_good.item",
                             foreignField: "_id",
-                            as: "customer_id"
+                            as: "finished_good_item"
                         }
                     },
                     {
                         $lookup: {
-                            from: "products",
-                            localField: "product_id",
+                            from: "boms",
+                            localField: "bom",
                             foreignField: "_id",
-                            as: "product_id"
+                            as: "bom"
                         }
                     }
                 ]
             }
-        }
-    ]).sort({ _id: -1 }).skip(skip).limit(limits);
+        },
+        {
+            $unwind: {
+                path: "$production_process",
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $unwind: {
+                path: "$production_process.finished_good_item",
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $unwind: {
+                path: "$production_process.bom",
+                preserveNullAndEmptyArrays: true
+            }
+        },
+        {
+            $addFields: {
+                Bom_name: { $ifNull: ["$production_process.bom.bom_name", "N/A"] },
+                Product: { $ifNull: ["$production_process.finished_good_item.name", "N/A"] },
+                ProductId: { $ifNull: ["$production_process.finished_good_item.product_id", "N/A"] },
+                Quantity: { $ifNull: ["$production_process.quantity", 0] },
+                Total: { $ifNull: ["$production_process.bom.total_cost", 0] },
+                Status: "$delivery_status",
+                PaymentStatus: "Unpaid"
+            }
+        },
+        {
+            $project: {
+                production_process: 0
+            }
+        },
+        { $sort: { _id: -1 } },
+        { $skip: skip },
+        { $limit: limits }
+    ]);
+
     return res.status(200).json({
         message: "Data",
-        data, 
+        data,
         totalData
-    })
+    });
 });
+
 
 exports.DeleteDispatch = TryCatch(async (req, res) => {
     const { id } = req.params;
@@ -85,6 +127,56 @@ exports.UpdateDispatch = TryCatch(async (req, res) => {
         message: "Data Updated Successful"
     })
 });
+exports.SendFromProduction = async (req, res) => {
+  try {
+    const { production_process_id } = req.body;
+
+    if (!production_process_id) {
+      return res.status(400).json({
+        success: false,
+        message: "production_process_id is required"
+      });
+    }
+
+    const ProductionProcess = require("../models/productionProcess");
+    const proc = await ProductionProcess.findById(production_process_id);
+
+    if (!proc) {
+      return res.status(404).json({
+        success: false,
+        message: "Production process not found"
+      });
+    }
+
+    // ✅ Update production process status
+    proc.status = "dispatched";
+    await proc.save();
+
+    // Create dispatch entry
+    const { DispatchModel } = require("../models/Dispatcher");
+    const doc = await DispatchModel.create({
+      creator: req.user?._id,          // if you have auth
+      production_process_id,           // Save production process reference
+      delivery_status: "Dispatch",
+      Sale_id: []                      // Optional, keep for sales link
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Sent to dispatch successfully",
+      data: doc
+    });
+
+  } catch (e) {
+    console.error("Error in SendFromProduction:", e);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: e.message
+    });
+  }
+};
+
 
 
 // exports.GetDispatch = TryCatch(async (req, res) => {

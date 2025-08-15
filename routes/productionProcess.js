@@ -10,12 +10,16 @@ const {
   updateStatus,
   requestForAllocation,
   markInventoryInTransit,
-  startProduction
+  startProduction,
+  pauseProduction,
+  sendToDispatch
 } = require("../controllers/process");
 const router = express.Router();
 router.get("/allocation", isAuthenticated, requestForAllocation);
 router.put("/inventory-in-transit", isAuthenticated, markInventoryInTransit); //new
 router.put("/start-production", isAuthenticated, startProduction);//new 
+router.put("/pause", isAuthenticated, pauseProduction);
+
 router.post("/", isAuthenticated, create);
 router.get("/all", isAuthenticated, all);
 router.get("/done/:_id", isAuthenticated, markDone);

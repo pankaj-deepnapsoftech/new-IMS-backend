@@ -5,6 +5,7 @@ const BOMScrapMaterial = require("../models/bom-scrap-material");
 const Product = require("../models/product");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 const BOMFinishedMaterial = require("../models/bom-finished-material");
+const { DispatchModel } = require("../models/Dispatcher");
 
 exports.create = TryCatch(async (req, res) => {
   const processData = req.body;
@@ -589,7 +590,28 @@ exports.updateStatus = TryCatch(async (req, res) => {
     updated: process,
   });
 });
+// Pause Production
+exports.pauseProduction = TryCatch(async (req, res) => {
+  const { _id } = req.body; // process ID
+  if (!_id) {
+    throw new ErrorHandler("Process ID is required", 400);
+  }
 
+  const process = await ProductionProcess.findById(_id);
+  if (!process) {
+    throw new ErrorHandler("Production process not found", 404);
+  }
+
+  // ✅ Change status to paused
+  process.status = "production paused";
+  await process.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Production process paused successfully",
+    updated: process,
+  });
+});
 
 
 

@@ -1,17 +1,27 @@
-const { Schema, model } = require("mongoose");
+const mongoose = require("mongoose");
 
-const DispatchSchema = new Schema({
-    Sale_id: { type: Schema.Types.ObjectId, ref: "purchase" },
-    tracking_id: { type: String,  trim: true },
-    tracking_web: { type: String, trim: true },
-    creator:{type:Schema.Types.ObjectId,ref:"User"},
-    delivery_status: { type: String, enum: ["Dispatch", "Delivered"] },
-    Task_status: { type: String, enum: ["Pending", "Processing", "Completed"],default:"Pending" }
-});
+const DispatchSchema = new mongoose.Schema(
+  {
+    // optional, already there:
+    creator: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 
+    // existing sale field – leave as-is if you also use sales:
+    Sale_id: [{ type: mongoose.Schema.Types.ObjectId, ref: "Purchase", default: [] }],
 
-exports.DispatchModel = model("Dispatch", DispatchSchema)
+    // ✅ NEW: link to the production process
+    production_process_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ProductionProcess",
+      index: true,
+      required: false
+    },
 
+    // status fields
+    delivery_status: { type: String, default: "Dispatch" },
+    Task_status: { type: String, default: "Pending" },
+  },
+  { timestamps: true, strict: true }
+);
 
-
-
+const DispatchModel = mongoose.model("Dispatch", DispatchSchema);
+module.exports = { DispatchModel };
