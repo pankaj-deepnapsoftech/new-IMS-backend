@@ -42,12 +42,12 @@ const productionProcessSchema = new Schema(
         "raw materials approved",
         "production in progress",
         "completed",
-        "dispatched", // new
-        "production paused", // new
-        "inventory allocated",//new
-        "request for allow inventory",//new
-        "inventory in transit",//new
-        "production started",//new
+        "dispatched",
+        "production paused",
+        "inventory allocated",
+        "request for allow inventory",
+        "inventory in transit",
+        "production started",
         "moved to inventory",
          "allocated",
          "out finish goods",
