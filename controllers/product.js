@@ -14,6 +14,12 @@ const {
   checkIndirectProductCsvValidity,
 } = require("../utils/checkIndirectProductCsvValidity");
 
+// Utility function to capitalize first letter of each word
+const capitalizeWords = (str) => {
+  if (!str) return str;
+  return str.replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 exports.create = TryCatch(async (req, res) => {
   const productDetails = req.body;
   console.log("Product details", productDetails);
@@ -24,6 +30,7 @@ exports.create = TryCatch(async (req, res) => {
 
   const product = await Product.create({
     ...productDetails,
+    name: capitalizeWords(productDetails.name),
     product_id: generatedId,
     approved: req.user.isSuper,
   });
@@ -60,6 +67,7 @@ exports.update = TryCatch(async (req, res) => {
     { _id },
     {
       ...productDetails,
+      name: capitalizeWords(productDetails.name),
       product_id: newProductId,
       approved: req.user.isSuper ? productDetails?.approved : false,
     },
@@ -214,6 +222,11 @@ exports.bulkUploadHandler = async (req, res) => {
     const processedProducts = [];
     for (const productData of jsonData) {
       let processedProduct = { ...productData };
+
+      // Capitalize the product name
+      if (processedProduct.name) {
+        processedProduct.name = capitalizeWords(processedProduct.name);
+      }
 
       // Debug: Log HSN code for each product
       console.log(
@@ -395,6 +408,11 @@ exports.bulkUploadHandlerIndirect = async (req, res) => {
     const processedProducts = [];
     for (const productData of jsonData) {
       let processedProduct = { ...productData };
+
+      // Capitalize the product name
+      if (processedProduct.name) {
+        processedProduct.name = capitalizeWords(processedProduct.name);
+      }
 
       // Always generate product_id automatically (ignore any provided product_id)
       processedProduct.product_id = await generateProductId(
@@ -590,6 +608,7 @@ exports.exportToExcel = TryCatch(async (req, res) => {
   const excelData = products.map((product) => ({
     "Inventory Category": product.inventory_category || "N/A",
     "Product Name": product.name || "N/A",
+    "Product Color": product.color_name || "N/A",
     "Product ID": product.product_id || "N/A", // Auto-generated, shown in export
     Store: product.store?.name || product.store || "N/A",
     UOM: product.uom || "N/A",
@@ -657,6 +676,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
     {
       inventory_category: "direct",
       name: "Sample Product 1",
+      color_name: "Red",
       uom: "kg",
       category: "raw materials",
       current_stock: 100,
@@ -677,6 +697,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
     {
       inventory_category: "direct",
       name: "Sample Service 1",
+      color_name: "Blue",
       uom: "hours",
       category: "service",
       current_stock: 0,
@@ -693,6 +714,7 @@ exports.downloadSampleTemplate = TryCatch(async (req, res) => {
     {
       inventory_category: "direct",
       name: "Trading Item 1",
+      color_name: "White",
       uom: "pcs",
       category: "trading goods",
       current_stock: 250,
@@ -781,6 +803,7 @@ exports.exportToExcelIndirect = TryCatch(async (req, res) => {
   const excelData = products.map((product) => ({
     "Inventory Category": product.inventory_category || "N/A",
     "Product Name": product.name || "N/A",
+    "Product Color": product.color_name || "N/A",
     "Product ID": product.product_id || "N/A", // Auto-generated, shown in export
     Store: product.store?.name || product.store || "N/A",
     UOM: product.uom || "N/A",
@@ -848,6 +871,7 @@ exports.downloadSampleTemplateIndirect = TryCatch(async (req, res) => {
     {
       inventory_category: "indirect",
       name: "Sample Product 1",
+      color_name: "Green",
       uom: "kg",
       category: "raw materials",
       current_stock: 100,
@@ -868,6 +892,7 @@ exports.downloadSampleTemplateIndirect = TryCatch(async (req, res) => {
     {
       inventory_category: "indirect",
       name: "Sample Service 1",
+      color_name: "Yellow",
       uom: "hours",
       category: "service",
       current_stock: 0,
@@ -884,6 +909,7 @@ exports.downloadSampleTemplateIndirect = TryCatch(async (req, res) => {
     {
       inventory_category: "indirect",
       name: "Trading Item 1",
+      color_name: "Black",
       uom: "pcs",
       category: "trading goods",
       current_stock: 250,
