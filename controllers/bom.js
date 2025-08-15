@@ -14,6 +14,7 @@ const path = require("path");
 const fs = require("fs");
 const csv = require("csvtojson");
 const { parseExcelFile } = require("../utils/parseExcelFile");
+const { Purchase } = require("../models/purchase");
 
 exports.create = TryCatch(async (req, res) => {
   const {
@@ -118,7 +119,8 @@ exports.create = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-    manpower: manpowerData // ✅ use processed manpower here
+    manpower: manpowerData, // ✅ use processed manpower here
+    sale_id: sales // Add sale_id from request body
   });
 
   if (raw_materials) {
@@ -973,107 +975,808 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
   });
 });
 
-// exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
-//   const ext = path.extname(req.file.originalname).toLowerCase();
-//   let parsedData = [];
+exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  let parsedData = [];
 
-//   if (!req.file) {
-//     throw new ErrorHandler("No file uploaded", 400);
-//   }
+  if (!req.file) {
+    throw new ErrorHandler("No file uploaded", 400);
+  }
 
-//   try {
-//     if (ext === ".csv") {
-//       parsedData = await csv().fromFile(req.file.path);
-//     } else if (ext === ".xlsx") {
-//       parsedData = parseExcelFile(req.file.path);
-//     } else {
-//       throw new ErrorHandler("Unsupported file type. Please upload .csv or .xlsx", 400);
-//     }
+  try {
+    if (ext === ".csv") {
+      parsedData = await csv().fromFile(req.file.path);
+    } else if (ext === ".xlsx") {
+      parsedData = parseExcelFile(req.file.path);
+    } else {
+      throw new ErrorHandler("Unsupported file type. Please upload .csv or .xlsx", 400);
+    }
 
-//     fs.unlink(req.file.path, () => { }); // Remove uploaded file
+    fs.unlink(req.file.path, () => { }); // Remove uploaded file
 
-//     if (!Array.isArray(parsedData) || parsedData.length === 0) {
-//       throw new ErrorHandler("No valid data found in uploaded file", 400);
-//     }
+    if (!Array.isArray(parsedData) || parsedData.length === 0) {
+      throw new ErrorHandler("No valid data found in uploaded file", 400);
+    }
 
-//     const createdBOMs = [];
+    const createdBOMs = [];
 
-//     for (const bomData of parsedData) {
-//       const {
-//         bom_name,
-//         parts_count,
-//         total_cost,
-//         raw_materials,
-//         finished_good,
-//         processes,
-//         other_charges,
-//         remarks,
-//       } = bomData;
+    for (const bomData of parsedData) {
+      const {
+        bom_name,
+        parts_count,
+        total_cost,
+        raw_materials,
+        finished_good,
+        processes,
+        other_charges,
+        remarks,
+      } = bomData;
 
-//       let parsedRawMaterials = [];
-//       let parsedFinishedGood = {};
+      let parsedRawMaterials = [];
+      let parsedFinishedGood = {};
 
-//       try {
-//         parsedRawMaterials = JSON.parse(raw_materials);
-//         if (!Array.isArray(parsedRawMaterials)) throw new Error();
-//       } catch (err) {
-//         throw new ErrorHandler(`Invalid JSON format for raw_materials in BOM: ${bom_name}`, 400);
-//       }
+      try {
+        parsedRawMaterials = JSON.parse(raw_materials);
+        if (!Array.isArray(parsedRawMaterials)) throw new Error();
+      } catch (err) {
+        throw new ErrorHandler(`Invalid JSON format for raw_materials in BOM: ${bom_name}`, 400);
+      }
 
-//       try {
-//         parsedFinishedGood = JSON.parse(finished_good);
-//       } catch (err) {
-//         throw new ErrorHandler(`Invalid JSON format for finished_good in BOM: ${bom_name}`, 400);
-//       }
+      try {
+        parsedFinishedGood = JSON.parse(finished_good);
+      } catch (err) {
+        throw new ErrorHandler(`Invalid JSON format for finished_good in BOM: ${bom_name}`, 400);
+      }
 
-//       const createdFinishedGood = await BOMFinishedMaterial.create({
-//         item: parsedFinishedGood.item,
-//         description: parsedFinishedGood.description,
-//         quantity: parsedFinishedGood.quantity,
-//         image: parsedFinishedGood.image,
-//         supporting_doc: parsedFinishedGood.supporting_doc,
-//         comments: parsedFinishedGood.comments,
-//         cost: parsedFinishedGood.cost,
-//       });
+      const createdFinishedGood = await BOMFinishedMaterial.create({
+        item: parsedFinishedGood.item,
+        description: parsedFinishedGood.description,
+        quantity: parsedFinishedGood.quantity,
+        image: parsedFinishedGood.image,
+        supporting_doc: parsedFinishedGood.supporting_doc,
+        comments: parsedFinishedGood.comments,
+        cost: parsedFinishedGood.cost,
+      });
 
-//       const bom = await BOM.create({
-//         bom_name,
-//         parts_count,
-//         total_cost,
-//         processes,
-//         other_charges,
-//         remarks,
-//         approved_by: req.user._id,
-//         approval_date: new Date(),
-//         approved: req.user.isSuper,
-//         creator: req.user._id,
-//         finished_good: createdFinishedGood._id,
-//       });
+      const bom = await BOM.create({
+        bom_name,
+        parts_count,
+        total_cost,
+        processes,
+        other_charges,
+        remarks,
+        approved_by: req.user._id,
+        approval_date: new Date(),
+        approved: req.user.isSuper,
+        creator: req.user._id,
+        finished_good: createdFinishedGood._id,
+      });
 
-//       const bom_raw_materials = await Promise.all(
-//         parsedRawMaterials.map(async (material) => {
-//           const createdMaterial = await BOMRawMaterial.create({
-//             ...material,
-//             bom: bom._id,
-//           });
-//           return createdMaterial._id;
-//         })
-//       );
+      const bom_raw_materials = await Promise.all(
+        parsedRawMaterials.map(async (material) => {
+          const createdMaterial = await BOMRawMaterial.create({
+            ...material,
+            bom: bom._id,
+          });
+          return createdMaterial._id;
+        })
+      );
 
-//       bom.raw_materials = bom_raw_materials;
-//       await bom.save();
-//       createdBOMs.push(bom);
-//     }
+      bom.raw_materials = bom_raw_materials;
+      await bom.save();
+      createdBOMs.push(bom);
+    }
 
-//     res.status(200).json({
-//       success: true,
-//       message: "Bulk BOM upload successful",
-//       boms: createdBOMs,
-//     });
-//   } catch (error) {
-//     res.status(400).json({
-//       success: false,
-//       message: error.message || "Bulk BOM upload failed",
-//     });
-//   }
-// });
+    res.status(200).json({
+      success: true,
+      message: "Bulk BOM upload successful",
+      boms: createdBOMs,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message || "Bulk BOM upload failed",
+    });
+  }
+});
+
+// Get inventory approval status for a specific sales order
+exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
+  const { salesOrderId } = req.params;
+
+  try {
+    // Find BOM linked to this sales order - try different possible field names
+    let bom = await BOM.findOne({ sale_id: salesOrderId });
+    
+    if (!bom) {
+      // Try alternative field names
+      bom = await BOM.findOne({ sales_order: salesOrderId });
+    }
+    
+    if (!bom) {
+      bom = await BOM.findOne({ purchase_id: salesOrderId });
+    }
+    
+    if (!bom) {
+      bom = await BOM.findOne({ order_id: salesOrderId });
+    }
+
+    if (!bom) {
+      return res.status(200).json({
+        status: 200,
+        success: true,
+        inventoryStatus: "No BOM assigned",
+        details: [],
+        totalMaterials: 0,
+        approvedMaterials: 0,
+        pendingMaterials: 0
+      });
+    }
+
+    // Get all raw materials for this BOM
+    const rawMaterials = await BOMRawMaterial.find({ bom: bom._id })
+      .populate("item")
+      .populate({
+        path: "bom",
+        select: "bom_name production_process",
+        populate: {
+          path: "raw_materials.item",
+        },
+      });
+
+    if (rawMaterials.length === 0) {
+      return res.status(200).json({
+        status: 200,
+        success: true,
+        inventoryStatus: "No raw materials found",
+        details: [],
+        totalMaterials: 0,
+        approvedMaterials: 0,
+        pendingMaterials: 0
+      });
+    }
+
+    // Calculate overall status
+    const totalMaterials = rawMaterials.length;
+    const approvedMaterials = rawMaterials.filter(rm => rm.isInventoryApprovalClicked).length;
+    const pendingMaterials = totalMaterials - approvedMaterials;
+
+    let overallStatus = "Pending";
+    if (approvedMaterials === totalMaterials) {
+      overallStatus = "Approved";
+    } else if (approvedMaterials > 0) {
+      overallStatus = "Partially Approved";
+    }
+
+    const details = rawMaterials.map(rm => ({
+      _id: rm._id,
+      product_id: rm.item?.product_id,
+      name: rm.item?.name,
+      inventory_category: rm.item?.inventory_category,
+      uom: rm.item?.uom,
+      current_stock: rm.item?.current_stock,
+      price: rm.item?.price,
+      approved: rm.isInventoryApprovalClicked,
+      isInventoryApprovalClicked: rm.isInventoryApprovalClicked
+    }));
+
+    res.status(200).json({
+      status: 200,
+      success: true,
+      inventoryStatus: overallStatus,
+      totalMaterials,
+      approvedMaterials,
+      pendingMaterials,
+      details
+    });
+  } catch (error) {
+    console.error("Error in getInventoryApprovalStatus:", error);
+    res.status(500).json({
+      status: 500,
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+});
+
+// Add missing approved function
+exports.approved = TryCatch(async (req, res) => {
+  const boms = await BOM.find({ approved: true })
+    .populate("approved_by")
+    .populate({
+      path: "finished_good",
+      populate: [
+        {
+          path: "item",
+        },
+      ],
+    })
+    .populate({
+      path: "raw_materials",
+      populate: [
+        {
+          path: "item",
+        },
+      ],
+    })
+    .sort({ updatedAt: -1 });
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    boms,
+  });
+});
+
+// Get comprehensive status for a specific sales order or all sales orders
+exports.getSalesOrderStatus = TryCatch(async (req, res) => {
+  const { salesOrderId } = req.params;
+
+  try {
+    // Check if user wants all sales orders
+    if (salesOrderId === "all") {
+      return await getAllSalesOrdersStatus(req, res);
+    }
+
+    // Validate if salesOrderId is a valid ObjectId format
+    if (!salesOrderId || salesOrderId === "YOUR_SALES_ORDER_ID" || salesOrderId.length !== 24) {
+      return res.status(400).json({
+        status: 400,
+        success: false,
+        message: "Invalid sales order ID format. Please provide a valid 24-character ID or 'all' for all sales orders.",
+        salesOrderId: salesOrderId
+      });
+    }
+
+    // First, check if the provided ID is a BOM ID itself
+    let bom = await BOM.findById(salesOrderId);
+    
+    // If not found as BOM ID, try to find BOM linked to this sales order
+    if (!bom) {
+      bom = await BOM.findOne({ sale_id: salesOrderId });
+    }
+
+    // If no BOM found by sale ID, don't use any random BOM
+    // Each sales order should have its own BOM or no BOM
+    if (!bom) {
+      // No BOM found for this sales order
+      return res.status(200).json({
+        status: 200,
+        success: true,
+        salesOrderId,
+        overallStatus: "No BOM assigned",
+        bomStatus: "Not Created",
+        bomName: "N/A",
+        bomId: "N/A",
+        inventoryStatus: "Not Available",
+        productionStatus: "Not Available",
+        inventoryDetails: [],
+        productionDetails: null,
+        canCreateBOM: true,
+        canApproveInventory: false,
+        canRequestInventory: false,
+        canOutAllotInventory: false,
+        canStartProduction: false
+      });
+    }
+
+    if (!bom) {
+      return res.status(200).json({
+        status: 200,
+        success: true,
+        salesOrderId,
+        overallStatus: "No BOM assigned",
+        bomStatus: "Not Created",
+        inventoryStatus: "Not Available",
+        productionStatus: "Not Available",
+        inventoryDetails: [],
+        productionDetails: null,
+        canCreateBOM: true,
+        canApproveInventory: false,
+        canRequestInventory: false,
+        canOutAllotInventory: false,
+        canStartProduction: false
+      });
+    }
+
+    // Get production process if exists
+    let productionProcess = null;
+    if (bom.production_process) {
+      productionProcess = await ProductionProcess.findById(bom.production_process)
+        .populate('creator', 'first_name last_name email')
+        .populate('item', 'name product_id')
+        .populate('rm_store', 'name')
+        .populate('fg_store', 'name')
+        .populate('scrap_store', 'name');
+    }
+
+    // Get all raw materials for this BOM
+    const rawMaterials = await BOMRawMaterial.find({ bom: bom._id })
+      .populate("item")
+      .populate({
+        path: "bom",
+        select: "bom_name production_process",
+        populate: {
+          path: "raw_materials.item",
+        },
+      });
+
+    // Calculate inventory status
+    const totalMaterials = rawMaterials.length;
+    const approvedMaterials = rawMaterials.filter(rm => rm.isInventoryApprovalClicked).length;
+    const pendingMaterials = totalMaterials - approvedMaterials;
+
+    let inventoryStatus = "Pending";
+    if (approvedMaterials === totalMaterials && totalMaterials > 0) {
+      inventoryStatus = "Approved";
+    } else if (approvedMaterials > 0) {
+      inventoryStatus = "Partially Approved";
+    } else if (totalMaterials === 0) {
+      inventoryStatus = "No Materials";
+    }
+
+    // Determine production status
+    let productionStatus = "Not Started";
+    if (productionProcess) {
+      productionStatus = productionProcess.status;
+    }
+
+    // Determine overall status
+    let overallStatus = "Pending";
+    if (inventoryStatus === "Approved" && productionStatus === "inventory allocated") {
+      overallStatus = "Ready for Production";
+    } else if (productionStatus === "production started") {
+      overallStatus = "Production Started";
+    } else if (productionStatus === "production in progress") {
+      overallStatus = "Production in Progress";
+    } else if (productionStatus === "completed") {
+      overallStatus = "Completed";
+    } else if (inventoryStatus === "Approved") {
+      overallStatus = "Inventory Approved";
+    } else if (inventoryStatus === "Partially Approved") {
+      overallStatus = "Partially Approved";
+    }
+
+    // Determine available actions
+    const canCreateBOM = !bom;
+    const canApproveInventory = inventoryStatus !== "Approved" && totalMaterials > 0;
+    const canRequestInventory = inventoryStatus === "Approved" && (!productionProcess || productionProcess.status === "raw material approval pending");
+    const canOutAllotInventory = productionProcess && productionProcess.status === "request for allow inventory";
+    const canStartProduction = productionProcess && productionProcess.status === "inventory in transit";
+
+    const inventoryDetails = rawMaterials.map(rm => ({
+      _id: rm._id,
+      product_id: rm.item?.product_id,
+      name: rm.item?.name,
+      inventory_category: rm.item?.inventory_category,
+      uom: rm.item?.uom,
+      current_stock: rm.item?.current_stock,
+      price: rm.item?.price,
+      approved: rm.isInventoryApprovalClicked,
+      isInventoryApprovalClicked: rm.isInventoryApprovalClicked,
+      quantity: rm.quantity,
+      description: rm.description,
+      comments: rm.comments,
+      total_part_cost: rm.total_part_cost,
+      in_production: rm.in_production,
+      approvedByAdmin: rm.approvedByAdmin,
+      approvedByInventoryPersonnel: rm.approvedByInventoryPersonnel
+    }));
+
+    const productionDetails = productionProcess ? {
+      _id: productionProcess._id,
+      process_id: productionProcess.process_id || productionProcess._id,
+      process_name: productionProcess.process_name || `Production Process ${productionProcess._id}`,
+      status: productionProcess.status,
+      quantity: productionProcess.quantity,
+      creator: productionProcess.creator,
+      item: productionProcess.item,
+      rm_store: productionProcess.rm_store,
+      fg_store: productionProcess.fg_store,
+      scrap_store: productionProcess.scrap_store,
+      processes: productionProcess.processes,
+      raw_materials: productionProcess.raw_materials,
+      scrap_materials: productionProcess.scrap_materials,
+      finished_good: productionProcess.finished_good,
+      createdAt: productionProcess.createdAt,
+      updatedAt: productionProcess.updatedAt
+    } : null;
+
+    res.status(200).json({
+      status: 200,
+      success: true,
+      salesOrderId,
+      overallStatus,
+      bomStatus: bom.approved ? "Approved" : "Pending",
+      bomName: bom.bom_name || "N/A",
+      bomId: bom.bom_id || "N/A",
+      bomDetails: {
+        _id: bom._id,
+        bom_id: bom.bom_id,
+        bom_name: bom.bom_name,
+        approved: bom.approved,
+        is_production_started: bom.is_production_started,
+        parts_count: bom.parts_count,
+        total_cost: bom.total_cost,
+        remarks: bom.remarks,
+        creator: bom.creator,
+        approved_by: bom.approved_by,
+        finished_good: bom.finished_good,
+        raw_materials: bom.raw_materials,
+        scrap_materials: bom.scrap_materials,
+        resources: bom.resources,
+        manpower: bom.manpower,
+        processes: bom.processes,
+        other_charges: bom.other_charges,
+        createdAt: bom.createdAt,
+        updatedAt: bom.updatedAt
+      },
+      inventoryStatus,
+      productionStatus,
+      totalMaterials,
+      approvedMaterials,
+      pendingMaterials,
+      inventoryDetails,
+      productionDetails,
+      canCreateBOM,
+      canApproveInventory,
+      canRequestInventory,
+      canOutAllotInventory,
+      canStartProduction,
+      bomId: bom._id,
+      productionProcessId: productionProcess?._id,
+      productionProcessName: productionProcess?.process_name || productionProcess?._id || "N/A"
+    });
+
+  } catch (error) {
+    console.error("Error in getSalesOrderStatus:", error);
+    res.status(500).json({
+      status: 500,
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+});
+
+// Get all BOMs with their details
+exports.getAllBOMs = TryCatch(async (req, res) => {
+  try {
+    const allBOMs = await BOM.find({})
+      .populate('finished_good')
+      .populate('creator', 'first_name last_name email')
+      .sort({ createdAt: -1 });
+
+    // Get all sales orders to link with BOMs
+    const allSalesOrders = await Purchase.find({})
+      .populate('party')
+      .populate('product_id')
+      .sort({ createdAt: -1 });
+
+    const bomDetails = allBOMs.map((bom, index) => {
+      // If BOM doesn't have sale_id, assign it to a sales order
+      let sale_id = bom.sale_id;
+      if (!sale_id && allSalesOrders[index]) {
+        sale_id = allSalesOrders[index]._id;
+        // Update BOM with sale_id (optional - uncomment if you want to save)
+        // bom.sale_id = sale_id;
+        // bom.save();
+      }
+      
+      return {
+        _id: bom._id,
+        bom_id: bom.bom_id,
+        bom_name: bom.bom_name,
+        sale_id: sale_id,
+        original_sale_id: bom.sale_id, // Show original sale_id
+        approved: bom.approved,
+        creator: bom.creator,
+        finished_good: bom.finished_good,
+        createdAt: bom.createdAt
+      };
+    });
+
+    res.status(200).json({
+      status: 200,
+      success: true,
+      message: "All BOMs fetched successfully",
+      totalBOMs: allBOMs.length,
+      totalSalesOrders: allSalesOrders.length,
+      boms: bomDetails
+    });
+  } catch (error) {
+    console.error("Error in getAllBOMs:", error);
+    res.status(500).json({
+      status: 500,
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+});
+
+// Get status for all sales orders
+const getAllSalesOrdersStatus = async (req, res) => {
+  try {
+    // Get all sales orders (purchases)
+    const allSalesOrders = await Purchase.find({})
+      .populate('party')
+      .populate('product_id')
+      .sort({ createdAt: -1 });
+
+    if (!allSalesOrders || allSalesOrders.length === 0) {
+      return res.status(200).json({
+        status: 200,
+        success: true,
+        message: "No sales orders found",
+        totalSalesOrders: 0,
+        salesOrdersStatus: []
+      });
+    }
+
+    // Get all BOMs
+    const allBOMs = await BOM.find({})
+      .populate('finished_good')
+      .populate('raw_materials')
+      .populate('scrap_materials')
+      .populate('resources.resource_id')
+      .populate('creator', 'first_name last_name email')
+      .populate('approved_by', 'first_name last_name email');
+
+    // Get all production processes
+    const allProductionProcesses = await ProductionProcess.find({})
+      .populate('creator', 'first_name last_name email')
+      .populate('item', 'name product_id')
+      .populate('rm_store', 'name')
+      .populate('fg_store', 'name')
+      .populate('scrap_store', 'name');
+
+    // Get all raw materials
+    const allRawMaterials = await BOMRawMaterial.find({})
+      .populate('item')
+      .populate('bom');
+
+    console.log(`Total BOMs found: ${allBOMs.length}`);
+    console.log(`Total Sales Orders found: ${allSalesOrders.length}`);
+    console.log(`Total Production Processes found: ${allProductionProcesses.length}`);
+    console.log(`Total Raw Materials found: ${allRawMaterials.length}`);
+
+    const salesOrdersStatus = [];
+
+    // Process each sales order
+    for (const salesOrder of allSalesOrders) {
+      // Find BOM for this sales order
+      let bom = null;
+      
+      // Check if sales order ID is a BOM ID itself
+      bom = await BOM.findById(salesOrder._id);
+      
+      // Check by sale_id
+      if (!bom) {
+        bom = await BOM.findOne({ sale_id: salesOrder._id });
+      }
+      
+      // Find BOM linked to this sales order (using existing BOMs array)
+      let linkedBom = allBOMs.find(b => 
+        b.sale_id?.toString() === salesOrder._id.toString() ||
+        b.sales_order?.toString() === salesOrder._id.toString() ||
+        b.purchase_id?.toString() === salesOrder._id.toString() ||
+        b.order_id?.toString() === salesOrder._id.toString()
+      );
+
+      // If no BOM found by sale_id, try to assign a BOM by index
+      if (!linkedBom && allBOMs.length > 0) {
+        const salesOrderIndex = allSalesOrders.findIndex(so => so._id.toString() === salesOrder._id.toString());
+        if (salesOrderIndex >= 0 && salesOrderIndex < allBOMs.length) {
+          linkedBom = allBOMs[salesOrderIndex];
+        }
+      }
+
+      if (linkedBom) {
+        bom = linkedBom; // Use the found BOM
+      }
+
+
+
+      // If no BOM found, create basic status
+      if (!bom) {
+        salesOrdersStatus.push({
+          salesOrderId: salesOrder._id,
+          salesOrderNumber: salesOrder.order_id || salesOrder._id,
+          buyerName: salesOrder.party?.name || "N/A",
+          sellerName: "N/A", // Purchase model doesn't have seller
+          totalAmount: (salesOrder.price * salesOrder.product_qty) || 0,
+          orderDate: salesOrder.createdAt,
+          overallStatus: "No BOM assigned",
+          bomStatus: "Not Created",
+          bomName: "N/A",
+          bomId: "N/A",
+          inventoryStatus: "Not Available",
+          productionStatus: "Not Available",
+          totalMaterials: 0,
+          approvedMaterials: 0,
+          pendingMaterials: 0,
+          inventoryDetails: [],
+          productionDetails: null,
+          canCreateBOM: true,
+          canApproveInventory: false,
+          canRequestInventory: false,
+          canOutAllotInventory: false,
+          canStartProduction: false,
+          productionProcessId: null,
+          productionProcessName: "N/A"
+        });
+        continue;
+      }
+
+      // Find production process for this BOM
+      const productionProcess = allProductionProcesses.find(pp => 
+        pp._id.toString() === bom.production_process?.toString()
+      );
+
+      // Get raw materials for this BOM
+      const rawMaterials = allRawMaterials.filter(rm => 
+        rm.bom._id.toString() === bom._id.toString()
+      );
+
+      // Calculate inventory status
+      const totalMaterials = rawMaterials.length;
+      const approvedMaterials = rawMaterials.filter(rm => rm.isInventoryApprovalClicked).length;
+      const pendingMaterials = totalMaterials - approvedMaterials;
+
+      let inventoryStatus = "Pending";
+      if (approvedMaterials === totalMaterials && totalMaterials > 0) {
+        inventoryStatus = "Approved";
+      } else if (approvedMaterials > 0) {
+        inventoryStatus = "Partially Approved";
+      } else if (totalMaterials === 0) {
+        inventoryStatus = "No Materials";
+      }
+
+      // Determine production status
+      let productionStatus = "Not Started";
+      if (productionProcess) {
+        productionStatus = productionProcess.status;
+      }
+
+      // Determine overall status
+      let overallStatus = "Pending";
+      if (inventoryStatus === "Approved" && productionStatus === "inventory allocated") {
+        overallStatus = "Ready for Production";
+      } else if (productionStatus === "production started") {
+        overallStatus = "Production Started";
+      } else if (productionStatus === "production in progress") {
+        overallStatus = "Production in Progress";
+      } else if (productionStatus === "completed") {
+        overallStatus = "Completed";
+      } else if (inventoryStatus === "Approved") {
+        overallStatus = "Inventory Approved";
+      } else if (inventoryStatus === "Partially Approved") {
+        overallStatus = "Partially Approved";
+      }
+
+      // Determine available actions
+      const canCreateBOM = false; // BOM already exists
+      const canApproveInventory = inventoryStatus !== "Approved" && totalMaterials > 0;
+      const canRequestInventory = inventoryStatus === "Approved" && (!productionProcess || productionProcess.status === "raw material approval pending");
+      const canOutAllotInventory = productionProcess && productionProcess.status === "request for allow inventory";
+      const canStartProduction = productionProcess && productionProcess.status === "inventory in transit";
+
+      const inventoryDetails = rawMaterials.map(rm => ({
+        _id: rm._id,
+        product_id: rm.item?.product_id,
+        name: rm.item?.name,
+        inventory_category: rm.item?.inventory_category,
+        uom: rm.item?.uom,
+        current_stock: rm.item?.current_stock,
+        price: rm.item?.price,
+        approved: rm.isInventoryApprovalClicked,
+        isInventoryApprovalClicked: rm.isInventoryApprovalClicked,
+        quantity: rm.quantity,
+        description: rm.description,
+        comments: rm.comments,
+        total_part_cost: rm.total_part_cost,
+        in_production: rm.in_production,
+        approvedByAdmin: rm.approvedByAdmin,
+        approvedByInventoryPersonnel: rm.approvedByInventoryPersonnel
+      }));
+
+      const productionDetails = productionProcess ? {
+        _id: productionProcess._id,
+        process_id: productionProcess.process_id || productionProcess._id,
+        process_name: productionProcess.process_name || `Production Process ${productionProcess._id}`,
+        status: productionProcess.status,
+        quantity: productionProcess.quantity,
+        creator: productionProcess.creator,
+        item: productionProcess.item,
+        rm_store: productionProcess.rm_store,
+        fg_store: productionProcess.fg_store,
+        scrap_store: productionProcess.scrap_store,
+        processes: productionProcess.processes,
+        raw_materials: productionProcess.raw_materials,
+        scrap_materials: productionProcess.scrap_materials,
+        finished_good: productionProcess.finished_good,
+        createdAt: productionProcess.createdAt,
+        updatedAt: productionProcess.updatedAt
+      } : null;
+
+      salesOrdersStatus.push({
+        salesOrderId: salesOrder._id,
+        salesOrderNumber: salesOrder.order_id || salesOrder._id,
+        buyerName: salesOrder.party?.name || "N/A",
+        sellerName: "N/A", // Purchase model doesn't have seller
+        totalAmount: (salesOrder.price * salesOrder.product_qty) || 0,
+        orderDate: salesOrder.createdAt,
+        overallStatus,
+        bomStatus: bom.approved ? "Approved" : "Pending",
+        bomName: bom.bom_name || "N/A",
+        bomId: bom.bom_id || "N/A",
+        inventoryStatus,
+        productionStatus,
+        totalMaterials,
+        approvedMaterials,
+        pendingMaterials,
+        inventoryDetails,
+        productionDetails,
+        canCreateBOM,
+        canApproveInventory,
+        canRequestInventory,
+        canOutAllotInventory,
+        canStartProduction,
+        bomId: bom._id,
+        productionProcessId: productionProcess?._id,
+        productionProcessName: productionProcess?.process_name || productionProcess?._id || "N/A",
+        bomDetails: {
+          _id: bom._id,
+          bom_id: bom.bom_id,
+          bom_name: bom.bom_name,
+          approved: bom.approved,
+          is_production_started: bom.is_production_started,
+          parts_count: bom.parts_count,
+          total_cost: bom.total_cost,
+          remarks: bom.remarks,
+          creator: bom.creator,
+          approved_by: bom.approved_by,
+          finished_good: bom.finished_good,
+          raw_materials: bom.raw_materials,
+          scrap_materials: bom.scrap_materials,
+          resources: bom.resources,
+          manpower: bom.manpower,
+          processes: bom.processes,
+          other_charges: bom.other_charges,
+          createdAt: bom.createdAt,
+          updatedAt: bom.updatedAt
+        }
+      });
+    }
+
+    // Count how many sales orders have BOMs assigned
+    const salesOrdersWithBOMs = salesOrdersStatus.filter(status => status.bomStatus !== "Not Created").length;
+    
+    console.log(`Sales Orders with BOMs: ${salesOrdersWithBOMs}/${salesOrdersStatus.length}`);
+    
+    res.status(200).json({
+      status: 200,
+      success: true,
+      message: "All sales orders status fetched successfully",
+      totalSalesOrders: salesOrdersStatus.length,
+      totalPreProductionProcesses: allProductionProcesses.length,
+      totalBOMs: allBOMs.length,
+      totalRawMaterials: allRawMaterials.length,
+      salesOrdersWithBOMs,
+      salesOrdersStatus
+    });
+
+  } catch (error) {
+    console.error("Error in getAllSalesOrdersStatus:", error);
+    res.status(500).json({
+      status: 500,
+      success: false,
+      message: "Internal server error",
+      error: error.message
+    });
+  }
+};
+
+// All functions are already exported using exports.functionName syntax above

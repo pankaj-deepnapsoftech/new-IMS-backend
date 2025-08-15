@@ -45,7 +45,7 @@ const productionProcessSchema = new Schema(
         "inventory allocated",//new
         "request for allow inventory",//new
         "inventory in transit",//new
-        "production started",//new
+        "assign a task",//new
 
       ],
       default: "raw material approval pending",
