@@ -299,15 +299,15 @@ exports.update = async (req, res) => {
     });
   }
 
-  // If any changes detected and status is not "assign a task", set to "work in progress"
+  // If any changes detected and status is not "production started", set to "work in progress"
   console.log("hasChanges:", hasChanges);
   console.log("current status:", productionProcess.status);
   console.log("status from request:", status);
   
-  if (hasChanges && productionProcess.status === "assign a task") {
+  if (hasChanges && productionProcess.status === "production started") {
     productionProcess.status = "production in progress";
     console.log("Status changed to production in progress");
-  } else if (productionProcess.status !== "assign a task" && typeof status === "string" && status.trim() !== "") {
+  } else if (productionProcess.status !== "production started" && typeof status === "string" && status.trim() !== "") {
     productionProcess.status = status;
     console.log("Status changed to:", status);
   } else {
@@ -666,13 +666,13 @@ exports.startProduction = async (req, res) => {
     // }
 
     // 7️⃣ Update process status
-    process.status = "assign a task";
+    process.status = "production started";
     process.productionStartedAt = new Date();
     await process.save();
 
     res.status(200).json({
       success: true,
-      message: "Task assigned successfully",
+      message: "Production started successfully",
       process,
     });
 

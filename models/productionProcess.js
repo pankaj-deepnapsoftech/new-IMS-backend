@@ -45,7 +45,7 @@ const productionProcessSchema = new Schema(
         "inventory allocated",//new
         "request for allow inventory",//new
         "inventory in transit",//new
-        "assign a task",//new
+        "production started",//new
  "moved to inventory",
          "allocated",
          "out finish goods",
