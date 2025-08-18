@@ -65,7 +65,12 @@ exports.create = TryCatch(async (req, res) => {
   if (invoice_no) invoiceData.invoice_no = invoice_no;
   if (document_date) invoiceData.document_date = document_date;
   if (sales_order_date) invoiceData.sales_order_date = sales_order_date;
-  if (store) invoiceData.store = store;
+  if (store) {
+    invoiceData.store = store;
+  } else {
+    // Create a default store if none provided
+    invoiceData.store = null;
+  }
   if (note) invoiceData.note = note;
   if (items) invoiceData.items = items;
   if (subtotal) invoiceData.subtotal = subtotal;

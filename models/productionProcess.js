@@ -21,7 +21,7 @@ const productionProcessSchema = new Schema(
       type: Number,
       required: [true, "Quantity is a required field"],
     },
-    rm_store: { 
+    rm_store: {
       type: Schema.Types.ObjectId,
       ref: "Store",
       required: [true, "Raw material store is a required field"],
@@ -45,8 +45,11 @@ const productionProcessSchema = new Schema(
         "inventory allocated",//new
         "request for allow inventory",//new
         "inventory in transit",//new
-        "production started",//new
-
+        "assign a task",//new
+ "moved to inventory",
+         "allocated",
+         "out finish goods",
+        "received"
       ],
       default: "raw material approval pending",
     },
@@ -72,7 +75,7 @@ const productionProcessSchema = new Schema(
           },
           work_done: {
             type: Number,
-            default: 0, 
+            default: 0,
           },
         },
       ],

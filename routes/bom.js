@@ -51,4 +51,17 @@ router
   .delete(isAuthenticated, isAllowed, remove)
   .get(isAuthenticated, isAllowed, details)
   .put(isAuthenticated, isAllowed, update);
+
+//   router.get(
+//   "/all/inventory/finished-goods",
+//   isAuthenticated,
+//   allFinishedGoodsForInventory
+// );
+
+// router.post(
+//   "/approve/inventory/finished-goods",
+//   isAuthenticated,
+//   approveFinishedGood
+// );
+
 module.exports = router;
