@@ -9,6 +9,7 @@ const {
   allSuppliers,
   getNextPONumber,
   bulkDelete,
+  getSupplierDetails,
 } = require("../controllers/purchaseOrder");
 const router = express.Router();
 
@@ -16,6 +17,7 @@ router.post("/", isAuthenticated, create);
 router.get("/all", isAuthenticated, all);
 router.get("/next-po-number", isAuthenticated, getNextPONumber);
 router.get("/suppliers", isAuthenticated, allSuppliers);
+router.get("/supplier/:supplierId", isAuthenticated, getSupplierDetails);
 router.delete("/bulk-delete", isAuthenticated, bulkDelete);
 
 router

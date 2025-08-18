@@ -10,15 +10,25 @@ exports.create = TryCatch(async (req, res) => {
   }
 
   // Validate required fields
-  const requiredFields = [
-    "supplierName",
-    "itemName",
-    "quantity",
-    "supplierType",
-  ];
+  const requiredFields = ["supplierName", "items", "supplierType"];
   for (const field of requiredFields) {
     if (!purchaseOrder[field]) {
       throw new ErrorHandler(`${field} is required`, 400);
+    }
+  }
+
+  // Validate items array
+  if (!Array.isArray(purchaseOrder.items) || purchaseOrder.items.length === 0) {
+    throw new ErrorHandler("At least one item is required", 400);
+  }
+
+  // Validate each item
+  for (const item of purchaseOrder.items) {
+    if (!item.itemName || !item.quantity || item.quantity < 1) {
+      throw new ErrorHandler(
+        "Each item must have a valid name and quantity",
+        400
+      );
     }
   }
 
@@ -108,6 +118,58 @@ exports.allSuppliers = TryCatch(async (req, res) => {
     success: true,
     suppliers: formatted,
     message: "Suppliers fetched successfully",
+  });
+});
+
+exports.getSupplierDetails = TryCatch(async (req, res) => {
+  const { supplierId } = req.params;
+
+  if (!supplierId) {
+    throw new ErrorHandler("Supplier ID is required", 400);
+  }
+
+  const supplier = await PartiesModels.findById(supplierId, {
+    _id: 1,
+    cust_id: 1,
+    consignee_name: 1,
+    company_name: 1,
+    type: 1,
+    shipped_to: 1,
+    bill_to: 1,
+    shipped_gst_to: 1,
+    bill_gst_to: 1,
+    pan_no: 1,
+    contact_number: 1,
+    email_id: 1,
+  });
+
+  if (!supplier) {
+    throw new ErrorHandler("Supplier not found", 404);
+  }
+
+  const formatted = {
+    id: supplier._id,
+    supplierCode: supplier.cust_id || "",
+    supplierName: Array.isArray(supplier.consignee_name)
+      ? supplier.consignee_name[0]
+      : supplier.consignee_name || "",
+    companyName: supplier.company_name || "",
+    supplierType: supplier.type || "Individual",
+    supplierShippedTo: supplier.shipped_to || "",
+    supplierBillTo: supplier.bill_to || "",
+    supplierShippedGSTIN: supplier.shipped_gst_to || "",
+    supplierBillGSTIN: supplier.bill_gst_to || "",
+    supplierPan: supplier.pan_no || "",
+    supplierEmail: Array.isArray(supplier.email_id)
+      ? supplier.email_id[0]
+      : supplier.email_id || "",
+  };
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    supplier: formatted,
+    message: "Supplier details fetched successfully",
   });
 });
 
