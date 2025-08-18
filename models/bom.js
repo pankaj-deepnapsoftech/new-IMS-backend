@@ -83,6 +83,10 @@ const bomSchema = new Schema(
       required: [true, "BOM name is a required field"],
       set: (value) => value.charAt(0).toUpperCase() + value.slice(1),
     },
+    sale_id: {
+      type: Schema.Types.ObjectId,
+      ref: "purchase",
+    },
     parts_count: {
       type: Number,
       required: [true, "Part's count is a required field"],
