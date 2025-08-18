@@ -37,6 +37,9 @@ const bomSchema = new Schema(
         },
         type: { type: String },
         specification: { type: String },
+        comments: {
+          type: String,
+        },
       },
     ],
     manpower: [

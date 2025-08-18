@@ -1,30 +1,34 @@
 const BOM = require("../models/bom");
+const Counter = require("../models/counter");
 
 const generateBomId = async () => {
-  try {
-    const prefix = "BOM";
+  const prefix = "BOM";
 
-    // Find the last BOM with BOM prefix
-    const lastBom = await BOM.findOne({
-      bom_id: { $regex: `^${prefix}` },
-    }).sort({ createdAt: -1 });
+  // Atomically find & increment
+  let counter = await Counter.findByIdAndUpdate(
+    { _id: "bom_id" },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
 
-    let nextId = 1;
+  // If this is the very first time, sync with DB
+  if (counter.seq === 1) {
+    const lastBom = await BOM.findOne({ bom_id: { $regex: /^BOM/ } })
+      .sort({ createdAt: -1 });
 
     if (lastBom) {
-      const lastId = lastBom.bom_id.replace(prefix, "");
-      const numericPart = parseInt(lastId);
-      if (!isNaN(numericPart)) {
-        nextId = numericPart + 1;
-      }
-    }
+      const numericPart = parseInt(lastBom.bom_id.replace(prefix, "")) || 0;
 
-    // Generate BOM ID with format: BOM001, BOM002, etc.
-    return `${prefix}${nextId.toString().padStart(3, "0")}`;
-  } catch (error) {
-    console.error("Error generating BOM ID:", error);
-    throw new Error("Failed to generate BOM ID");
+      // Reset counter higher than existing
+      counter = await Counter.findByIdAndUpdate(
+        { _id: "bom_id" },
+        { seq: numericPart + 1 },
+        { new: true }
+      );
+    }
   }
+
+  return `${prefix}${counter.seq.toString().padStart(3, "0")}`;
 };
 
 module.exports = { generateBomId };
