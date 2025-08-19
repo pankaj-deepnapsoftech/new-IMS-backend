@@ -21,6 +21,8 @@ const {
   clearUpdatedPrice,
   clearUpdatedStock,
   removeFromInventoryShortages,
+  updateShortageQuantity,
+  updateStockAndShortages,
 } = require("../controllers/product");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 const { isSuper } = require("../middlewares/isSuper");
@@ -66,6 +68,7 @@ router.post(
 router.post("/update-inventory", isAuthenticated, isAllowed, updateInventory);
 router.put("/update-price", isAuthenticated, isAllowed, updatePrice);
 router.put("/update-stock", isAuthenticated, isAllowed, updateStock);
+router.put("/update-stock-and-shortages", isAuthenticated, isAllowed, updateStockAndShortages);
 router.put(
   "/clear-updated-price",
   isAuthenticated,
@@ -83,6 +86,12 @@ router.put(
   isAuthenticated,
   isAllowed,
   removeFromInventoryShortages
+);
+router.put(
+  "/update-shortage-quantity",
+  isAuthenticated,
+  isAllowed,
+  updateShortageQuantity
 );
 
 // Utility route to round all existing prices to whole numbers
