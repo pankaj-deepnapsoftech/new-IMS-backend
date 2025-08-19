@@ -1,6 +1,6 @@
 //bom routes
 const express = require('express');
-const { create, unapproved, update,approved, remove, details, all, autoBom,findFinishedGoodBom, unapprovedRawMaterials, approveRawMaterial, approveRawMaterialForAdmin, unapprovedRawMaterialsForAdmin, bomsGroupedByWeekDay, bulkUploadBOMHandler, allRawMaterialsForInventory, getInventoryShortages, getInventoryApprovalStatus, getSalesOrderStatus, getAllBOMs } = require('../controllers/bom');
+const { create, unapproved, update,approved, remove, details, all, autoBom,findFinishedGoodBom, unapprovedRawMaterials, approveRawMaterial, approveRawMaterialForAdmin, unapprovedRawMaterialsForAdmin, bomsGroupedByWeekDay, bulkUploadBOMHandler, allRawMaterialsForInventory, getInventoryShortages, bulkRemove, getInventoryApprovalStatus, getSalesOrderStatus, getAllSalesOrdersStatus, getAllBOMs } = require('../controllers/bom');
 const { isAuthenticated } = require('../middlewares/isAuthenticated');
 const { isAllowed } = require('../middlewares/isAllowed');
 const { isSuper } = require('../middlewares/isSuper');
@@ -44,14 +44,17 @@ router.get("/weekly", isAuthenticated, bomsGroupedByWeekDay);
 router.get("/inventory-shortages", isAuthenticated, getInventoryShortages);
 router.get("/inventory-approval-status/:salesOrderId", isAuthenticated, getInventoryApprovalStatus);
 router.get("/sales-order-status/:salesOrderId", isAuthenticated, getSalesOrderStatus);
+router.get("/sales-order-status/all", isAuthenticated, getAllSalesOrdersStatus);
 router.get("/all-boms", isAuthenticated, getAllBOMs);
 router.get("/bom/:_id", isAuthenticated, findFinishedGoodBom);
+
+router.delete("/bulk-delete", isAuthenticated, isSuper, bulkRemove);
+
 router
   .route("/:id")
   .delete(isAuthenticated, isAllowed, remove)
   .get(isAuthenticated, isAllowed, details)
   .put(isAuthenticated, isAllowed, update);
-
 //   router.get(
 //   "/all/inventory/finished-goods",
 //   isAuthenticated,
