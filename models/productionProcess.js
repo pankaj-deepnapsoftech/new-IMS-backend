@@ -42,14 +42,14 @@ const productionProcessSchema = new Schema(
         "raw materials approved",
         "production in progress",
         "completed",
-        "inventory allocated",//new
-        "request for allow inventory",//new
-        "inventory in transit",//new
-        "production started",//new
- "moved to inventory",
-         "allocated",
-         "out finish goods",
-        "received"
+        "inventory allocated", //new
+        "request for allow inventory", //new
+        "inventory in transit", //new
+        "production started", //new
+        "moved to inventory",
+        "allocated",
+        "out finish goods",
+        "received",
       ],
       default: "raw material approval pending",
     },
