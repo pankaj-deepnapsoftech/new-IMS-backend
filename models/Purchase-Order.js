@@ -12,8 +12,18 @@ const PurchaseOrderSchema = new mongoose.Schema(
 
     poOrder: { type: String },
     date: { type: String },
-    itemName: { type: String },
-    quantity: { type: Number, required: true, min: 1 },
+    items: [
+      {
+        itemName: { type: String, required: true },
+        quantity: { type: Number, required: true, min: 1 },
+        unitPrice: { type: Number, default: 0 },
+        totalPrice: { type: Number, default: 0 },
+        productId: { type: String }, // Add productId field to store the product ID
+      },
+    ],
+    // Legacy fields for backward compatibility
+    // itemName: { type: String },
+    // quantity: { type: Number, min: 1 },
 
     supplierName: { type: String },
     supplierCode: { type: String },

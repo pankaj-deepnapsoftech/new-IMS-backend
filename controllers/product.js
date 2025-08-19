@@ -772,7 +772,7 @@ exports.rawMaterials = TryCatch(async (req, res) => {
   const rawMaterials = await Product.find({
     category: "raw materials",
     approved: true,
-  }).select("name _id");
+  }).select("name _id product_id ");
   res.status(200).json({
     status: 200,
     success: true,
