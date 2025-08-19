@@ -1244,3 +1244,226 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
     shortagesBefore: shortagesBefore.length,
   });
 });
+
+// Function to update shortage quantity for partially resolved items
+exports.updateShortageQuantity = TryCatch(async (req, res) => {
+  const { productId, newShortageQuantity } = req.body;
+
+  console.log("updateShortageQuantity called with:", { productId, newShortageQuantity });
+
+  if (!productId) {
+    throw new ErrorHandler("Please provide productId", 400);
+  }
+
+  if (newShortageQuantity === undefined || newShortageQuantity === null) {
+    throw new ErrorHandler("Please provide newShortageQuantity", 400);
+  }
+
+  if (newShortageQuantity < 0) {
+    throw new ErrorHandler("Shortage quantity cannot be negative", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  // Import InventoryShortage model
+  const InventoryShortage = require("../models/inventoryShortage");
+
+  // Find existing shortages for this product
+  const existingShortages = await InventoryShortage.find({ item: productId });
+  console.log("Existing shortages found:", existingShortages.length);
+
+  if (existingShortages.length === 0) {
+    throw new ErrorHandler("No shortages found for this product", 400);
+  }
+
+  // Update all shortages for this product with the new quantity
+  const updatePromises = existingShortages.map(shortage => 
+    InventoryShortage.findByIdAndUpdate(
+      shortage._id,
+      { shortage_quantity: newShortageQuantity },
+      { new: true }
+    )
+  );
+
+  const updatedShortages = await Promise.all(updatePromises);
+
+  console.log("Updated shortages:", updatedShortages.length);
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Shortage quantity updated successfully",
+    product: product,
+    updatedShortages: updatedShortages.length,
+    newShortageQuantity: newShortageQuantity,
+  });
+});
+
+// Function to update stock and automatically adjust shortages
+exports.updateStockAndShortages = TryCatch(async (req, res) => {
+  const { productId, newStock } = req.body;
+
+  console.log("updateStockAndShortages called with:", { productId, newStock });
+
+  if (!productId) {
+    throw new ErrorHandler("Please provide productId", 400);
+  }
+
+  if (newStock === undefined || newStock === null) {
+    throw new ErrorHandler("Please provide newStock", 400);
+  }
+
+  if (newStock < 0) {
+    throw new ErrorHandler("Stock cannot be negative", 400);
+  }
+
+  // Validate productId format
+  if (!productId.match(/^[0-9a-fA-F]{24}$/)) {
+    throw new ErrorHandler("Invalid product ID format", 400);
+  }
+
+  // Find the product
+  const product = await Product.findById(productId);
+  if (!product) {
+    throw new ErrorHandler("Product doesn't exist", 400);
+  }
+
+  const oldStock = product.current_stock;
+  const stockDifference = newStock - oldStock;
+
+  console.log("Stock change details:", {
+    productName: product.name,
+    oldStock: oldStock,
+    newStock: newStock,
+    stockDifference: stockDifference
+  });
+
+  // If no change in stock, return early
+  if (stockDifference === 0) {
+    return res.status(200).json({
+      status: 200,
+      success: true,
+      message: "No stock change detected",
+      product: product,
+      stockChange: {
+        oldStock: oldStock,
+        newStock: newStock,
+        stockDifference: stockDifference
+      },
+      shortageUpdate: null
+    });
+  }
+
+  // Update the product's current stock
+  const updatedProduct = await Product.findByIdAndUpdate(
+    productId,
+    {
+      current_stock: newStock,
+    },
+    { new: true }
+  );
+
+  // Import InventoryShortage model
+  const InventoryShortage = require("../models/inventoryShortage");
+
+  // Find existing shortages for this product
+  const existingShortages = await InventoryShortage.find({ item: productId });
+  console.log("Existing shortages found:", existingShortages.length);
+
+  let shortageUpdateResult = null;
+
+  if (existingShortages.length > 0) {
+    // Update all shortages for this product
+    const updatePromises = existingShortages.map(async (shortage) => {
+      const currentShortageQuantity = shortage.shortage_quantity;
+      const newShortageQuantity = Math.max(0, currentShortageQuantity - stockDifference);
+      
+      console.log("Shortage update:", {
+        shortageId: shortage._id,
+        currentShortage: currentShortageQuantity,
+        newShortage: newShortageQuantity,
+        stockDifference: stockDifference
+      });
+
+      // If new shortage quantity is 0, remove the shortage
+      if (newShortageQuantity === 0) {
+        return InventoryShortage.findByIdAndDelete(shortage._id);
+      } else {
+        return InventoryShortage.findByIdAndUpdate(
+          shortage._id,
+          { shortage_quantity: newShortageQuantity },
+          { new: true }
+        );
+      }
+    });
+
+    const updatedShortages = await Promise.all(updatePromises);
+    const removedShortages = updatedShortages.filter(result => result === null).length;
+    const activeShortages = updatedShortages.filter(result => result !== null);
+
+    shortageUpdateResult = {
+      totalShortages: existingShortages.length,
+      removedShortages: removedShortages,
+      activeShortages: activeShortages.length,
+      updatedShortages: activeShortages
+    };
+
+    console.log("Shortage update result:", shortageUpdateResult);
+  } else if (stockDifference < 0) {
+    // If stock is decreased and there are no existing shortages, create a new shortage
+    const shortageQuantity = Math.abs(stockDifference);
+    
+    // Find BOMs that use this product as raw material
+    const BOM = require("../models/bom");
+    const BOMRawMaterial = require("../models/bom-raw-material");
+    
+    const bomRawMaterials = await BOMRawMaterial.find({ item: productId });
+    const bomIds = bomRawMaterials.map(material => material.bom);
+    
+    if (bomIds.length > 0) {
+      // Create shortages for each BOM that uses this product
+      const shortagePromises = bomIds.map(async (bomId) => {
+        const bom = await BOM.findById(bomId);
+        if (bom) {
+          return InventoryShortage.create({
+            bom: bomId,
+            raw_material: bomRawMaterials.find(material => material.bom.toString() === bomId.toString())?._id,
+            item: productId,
+            shortage_quantity: shortageQuantity
+          });
+        }
+        return null;
+      });
+      
+      const newShortages = await Promise.all(shortagePromises);
+      const createdShortages = newShortages.filter(shortage => shortage !== null);
+      
+      shortageUpdateResult = {
+        totalShortages: 0,
+        removedShortages: 0,
+        activeShortages: createdShortages.length,
+        createdShortages: createdShortages.length,
+        updatedShortages: createdShortages
+      };
+      
+      console.log("Created new shortages:", shortageUpdateResult);
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Stock updated and shortages adjusted successfully",
+    product: updatedProduct,
+    stockChange: {
+      oldStock: oldStock,
+      newStock: newStock,
+      stockDifference: stockDifference
+    },
+    shortageUpdate: shortageUpdateResult
+  });
+});
