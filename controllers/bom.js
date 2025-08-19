@@ -64,13 +64,13 @@ exports.create = TryCatch(async (req, res) => {
 
     resources,
 
-    manpower 
+    manpower
 
   } = req.body;
 
 
 
-  
+
 
   const manpowerData = Array.isArray(manpower)
 
@@ -668,7 +668,7 @@ exports.update = TryCatch(async (req, res) => {
 
 
 
- 
+
 
   if (Array.isArray(manpower)) {
 
@@ -840,7 +840,7 @@ exports.details = TryCatch(async (req, res) => {
 
     })
 
- 
+
 
     .populate({
 
@@ -886,7 +886,7 @@ exports.all = TryCatch(async (req, res) => {
 
   const boms = await BOM.find({ approved: true })
 
-  
+
 
 
 
@@ -1841,15 +1841,10 @@ exports.getInventoryShortages = TryCatch(async (req, res) => {
 });
 
 exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
-
   const allRawMaterials = await BOMRawMaterial.find()
-
-    .populate("item") // ✅ To get product details like name, product_id, price
-
+    .populate("item")
     .populate({
-
       path: "bom",
-
       select: "bom_name production_process",
       populate: [
         {
@@ -1872,44 +1867,22 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
 
   const results = [];
 
-
-
   for (const rm of allRawMaterials) {
-
     const bom = rm.bom;
-    // const productionProcess = bom?.production_process;
     const item = rm.item;
 
-    // Validate all required fields and filter by allowed statuses
-    if (!bom || !productionProcess || !item) continue;
-    if (!allowedStatuses.includes(productionProcess.status)) continue;
-
-
-
-    if (!bom || !bom.production_process) continue;
-
-
+    if (!bom || !item || !bom.production_process) continue;
 
     const productionProcess = await ProductionProcess.findById(bom.production_process);
-
     if (!productionProcess) continue;
 
-
-
-  
-
-
+    if (!allowedStatuses.includes(productionProcess.status)) continue;
 
     results.push({
-
       _id: rm._id,
-
       bom_id: bom._id,
-
       bom_name: bom.bom_name,
-
       bom_status: productionProcess.status,
-
       production_process_id: productionProcess._id,
       product_id: item.product_id,
       name: item.name,
@@ -1923,32 +1896,21 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
       product_or_service: item.product_or_service,
       store: item.store,
       createdAt: rm.createdAt,
-
       updatedAt: rm.updatedAt,
-
       __v: rm.__v,
-
       change_type: rm.change_type,
-
       quantity_changed: rm.quantity_changed,
       isInventoryApprovalClicked: rm.isInventoryApprovalClicked,
     });
-
   }
 
-
-
   res.status(200).json({
-
     status: 200,
-
     success: true,
-
     unapproved: results,
-
   });
-
 });
+
 
 // Get all finished goods for inventory
 
@@ -2323,7 +2285,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
 
     let bom = await BOM.findOne({ sale_id: salesOrderId });
 
-    
+
 
     if (!bom) {
 
@@ -2333,7 +2295,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
 
     }
 
-    
+
 
     if (!bom) {
 
@@ -2341,7 +2303,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
 
     }
 
-    
+
 
     if (!bom) {
 
@@ -2611,7 +2573,7 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
 
     let bom = await BOM.findById(salesOrderId);
 
-    
+
 
     // If not found as BOM ID, try to find BOM linked to this sales order
 
@@ -3075,7 +3037,7 @@ exports.getAllBOMs = TryCatch(async (req, res) => {
 
       }
 
-      
+
 
       return {
 
@@ -3155,7 +3117,7 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       .populate('product_id')
 
-      // .sort({ createdAt: -1 });
+    // .sort({ createdAt: -1 });
 
 
 
@@ -3245,13 +3207,13 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       let bom = null;
 
-      
+
 
       // Check if sales order ID is a BOM ID itself
 
       bom = await BOM.findById(salesOrder._id);
 
-      
+
 
       // Check by sale_id
 
@@ -3261,11 +3223,11 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       }
 
-      
+
 
       // Find BOM linked to this sales order (using existing BOMs array)
 
-      let linkedBom = allBOMs.find(b => 
+      let linkedBom = allBOMs.find(b =>
 
         b.sale_id?.toString() === salesOrder._id.toString() ||
 
@@ -3371,7 +3333,7 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       // Find production process for this BOM
 
-      const productionProcess = allProductionProcesses.find(pp => 
+      const productionProcess = allProductionProcesses.find(pp =>
 
         pp._id.toString() === bom.production_process?.toString()
 
@@ -3381,7 +3343,7 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       // Get raw materials for this BOM
 
-      const rawMaterials = allRawMaterials.filter(rm => 
+      const rawMaterials = allRawMaterials.filter(rm =>
 
         rm.bom._id.toString() === bom._id.toString()
 
@@ -3655,11 +3617,11 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
     const salesOrdersWithBOMs = salesOrdersStatus.filter(status => status.bomStatus !== "Not Created").length;
 
-    
+
 
     console.log(`Sales Orders with BOMs: ${salesOrdersWithBOMs}/${salesOrdersStatus.length}`);
 
-    
+
 
     res.status(200).json({
 

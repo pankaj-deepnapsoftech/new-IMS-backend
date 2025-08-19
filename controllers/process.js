@@ -416,44 +416,51 @@ exports.receiveByInventory = async (req, res) => {
       return res.status(400).json({ message: "Process ID is required" });
     }
 
-    // Step 1: Find the production process
     const process = await ProductionProcess.findById(id);
     if (!process) {
       return res.status(404).json({ message: "Production process not found" });
     }
 
-    // Step 2: Update the process status to 'received' (received by inventory)
+    // Step 2: Update process status
     process.status = "received";
     await process.save();
 
-    // Step 3: Add finished goods to stock
-    const bomFinishedMaterial = await BOMFinishedMaterial.findById(process.finished_good);
+    // Step 3: Find finished good
+    if (!process.finished_good) {
+      return res.status(400).json({ message: "No finished good linked to this process." });
+    }
+
+    
+    const bomFinishedMaterial = process.finished_good;
+
     if (!bomFinishedMaterial) {
       return res.status(404).json({ message: "Finished good material not found" });
     }
 
-    const finishedProduct = await Product.findById(bomFinishedMaterial.item);
-    if (finishedProduct) {
-      // Update the current stock with the quantity of finished goods
-      finishedProduct.current_stock =
-        (finishedProduct.current_stock || 0) + bomFinishedMaterial.quantity;
-      finishedProduct.change_type = "increase";
-      finishedProduct.quantity_changed = bomFinishedMaterial.quantity;
+    // Step 4: Update finished product stock
+    if (!bomFinishedMaterial.item) {
+      return res.status(400).json({ message: "No finished product item found in BOM." });
+    }
 
-      // Save the updated product
-      await finishedProduct.save();
-    } else {
+    const finishedProduct = await Product.findById(bomFinishedMaterial.item);
+    if (!finishedProduct) {
       return res.status(404).json({ message: "Finished product not found" });
     }
 
-    // Send the response indicating success
+    finishedProduct.current_stock =
+      (finishedProduct.current_stock || 0) + bomFinishedMaterial.quantity;
+    finishedProduct.change_type = "increase";
+    finishedProduct.quantity_changed = bomFinishedMaterial.quantity;
+    await finishedProduct.save();
+
+    // Success
     res.status(200).json({
       message: "Finished goods received by inventory and stock updated successfully",
       process,
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server Error" });
+    console.error("Error in receiveByInventory:", error);
+    res.status(500).json({ message: error.message || "Server Error" });
   }
 };
 

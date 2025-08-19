@@ -49,7 +49,8 @@ const productionProcessSchema = new Schema(
          "moved to inventory",
          "allocated finish goods",
          "out finish goods",
-        "received"
+        "received",
+        "dispatched"
       ],
       default: "raw material approval pending",
     },
