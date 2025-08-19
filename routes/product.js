@@ -34,8 +34,8 @@ const router = express.Router();
 // CRUD operations
 router
   .route("/")
-  .post(isAuthenticated, isAllowed, create)
-  .put(isAuthenticated, isAllowed, update)
+  .post(isAuthenticated, create)
+  .put(isAuthenticated, update)
   .delete(isAuthenticated, isAllowed, remove);
 
 // Bulk delete operation
@@ -46,7 +46,7 @@ router.get("/all", isAuthenticated, all);
 router.get("/wip", isAuthenticated, workInProgressProducts);
 router.get("/unapproved", isAuthenticated, isSuper, unapproved);
 router.get("/raw-materials", isAuthenticated, rawMaterials);
-router.get("/:id", isAuthenticated, isAllowed, details);
+router.get("/:id", isAuthenticated, details);
 
 // Bulk operations
 router.post(

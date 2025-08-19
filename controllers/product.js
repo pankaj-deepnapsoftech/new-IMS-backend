@@ -20,7 +20,7 @@ const capitalizeWords = (str) => {
   return str.replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-exports.create = TryCatch(async (req, res) => {
+exports.create = TryCatch(async (req, res) => { 
   const productDetails = req.body;
   console.log("Product details", productDetails);
   if (!productDetails) {
@@ -34,7 +34,7 @@ exports.create = TryCatch(async (req, res) => {
     product_id: generatedId,
     approved: req.user.isSuper,
   });
-  console.log(product);
+  // console.log(product);
   res.status(200).json({
     status: 200,
     success: true,
@@ -69,7 +69,7 @@ exports.update = TryCatch(async (req, res) => {
       ...productDetails,
       name: capitalizeWords(productDetails.name),
       product_id: newProductId,
-      approved: req.user.isSuper ? productDetails?.approved : false,
+      // approved: req.user.isSuper ? productDetails?.approved : false,
     },
     { new: true }
   );
