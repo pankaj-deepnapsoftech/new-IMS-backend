@@ -396,7 +396,7 @@ exports.outFinishGoods = async (req, res) => {
 
 exports.getInventoryProcesses = TryCatch(async (req, res) => {
   // Array of statuses jo moved to inventory ke baad aate hain
-  const statuses = ["moved to inventory", "allocated","out finish goods"];
+  const statuses = ["moved to inventory", "allocated finish goods","out finish goods"];
 
   const processes = await ProductionProcess.find({ status: { $in: statuses } })
     .populate("finished_good.item"); // agar relation hai
@@ -757,7 +757,7 @@ exports.updateInventoryStatus = TryCatch(async (req, res) => {
     throw new ErrorHandler("Process ID and status are required", 400);
   }
 
-  const allowed = ["allocated", "received"];
+  const allowed = ["allocated finish goods", "received"];
   if (!allowed.includes(status)) {
     throw new ErrorHandler(`Invalid status. Allowed: ${allowed.join(", ")}`, 400);
   }
@@ -766,8 +766,8 @@ exports.updateInventoryStatus = TryCatch(async (req, res) => {
   if (!process) throw new ErrorHandler("Production process not found", 404);
 
   // optional: simple guard to avoid illogical reversal
-  if (process.status === "received" && status === "allocated") {
-    throw new ErrorHandler("Cannot move from 'received' back to 'allocated'", 400);
+  if (process.status === "received" && status === "allocated finish goods") {
+    throw new ErrorHandler("Cannot move from 'received' back to 'allocated finish goods'", 400);
   }
 
   process.status = status;

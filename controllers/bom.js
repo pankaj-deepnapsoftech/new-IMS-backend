@@ -921,26 +921,39 @@ exports.getInventoryShortages = TryCatch(async (req, res) => {
 });
 exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
   const allRawMaterials = await BOMRawMaterial.find()
-    .populate("item") // ✅ To get product details like name, product_id, price
+    .populate("item")
     .populate({
       path: "bom",
       select: "bom_name production_process",
-      populate: {
-        path: "raw_materials.item", // fully populate nested items
-      },
+      populate: [
+        {
+          path: "production_process",
+          select: "status",
+        },
+        {
+          path: "raw_materials.item",
+        },
+      ],
     });
+
+  const allowedStatuses = [
+    "raw material approval pending",
+    "raw materials approved",
+    "Inventory Allocated",
+    "request for allow inventory",
+    "inventory in transit",
+  ];
 
   const results = [];
 
   for (const rm of allRawMaterials) {
     const bom = rm.bom;
-
-    if (!bom || !bom.production_process) continue;
-
-    const productionProcess = await ProductionProcess.findById(bom.production_process);
-    if (!productionProcess) continue;
-
+    const productionProcess = bom?.production_process;
     const item = rm.item;
+
+    // Validate all required fields and filter by allowed statuses
+    if (!bom || !productionProcess || !item) continue;
+    if (!allowedStatuses.includes(productionProcess.status)) continue;
 
     results.push({
       _id: rm._id,
@@ -948,23 +961,23 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
       bom_name: bom.bom_name,
       bom_status: productionProcess.status,
       production_process_id: productionProcess._id,
-      product_id: item?.product_id,
-      name: item?.name,
-      inventory_category: item?.inventory_category,
-      uom: item?.uom,
-      category: item?.category,
-      current_stock: item?.current_stock,
-      price: item?.price,
-      approved: item?.approved,
-      item_type: item?.item_type,
-      product_or_service: item?.product_or_service,
-      store: item?.store,
+      product_id: item.product_id,
+      name: item.name,
+      inventory_category: item.inventory_category,
+      uom: item.uom,
+      category: item.category,
+      current_stock: item.current_stock,
+      price: item.price,
+      approved: item.approved,
+      item_type: item.item_type,
+      product_or_service: item.product_or_service,
+      store: item.store,
       createdAt: rm.createdAt,
       updatedAt: rm.updatedAt,
       __v: rm.__v,
       change_type: rm.change_type,
       quantity_changed: rm.quantity_changed,
-      isInventoryApprovalClicked: rm.isInventoryApprovalClicked
+      isInventoryApprovalClicked: rm.isInventoryApprovalClicked,
     });
   }
 
@@ -974,6 +987,7 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
     unapproved: results,
   });
 });
+
 // Get all finished goods for inventory
 // exports.allFinishedGoodsForInventory = TryCatch(async (req, res) => {
 //   const allFinishedGoods = await BOMFinishedMaterial.find()
