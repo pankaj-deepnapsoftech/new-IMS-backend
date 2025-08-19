@@ -32,6 +32,7 @@ router.put("/pause", isAuthenticated, pauseProduction);
 router.post("/", isAuthenticated, create);
 router.get("/all", isAuthenticated, all);
 router.get("/done/:_id", isAuthenticated, markDone);
+router.delete("/bulk-delete", isAuthenticated, bulkDelete);
 router.route("/:_id")
   .get(isAuthenticated, details)
   .put(isAuthenticated, update)
@@ -41,7 +42,6 @@ router.route("/:_id")
 router.post("/update-inventory-status", isAuthenticated, updateInventoryStatus);
 router.put("/update-status", updateStatus);
 router.post("/move-to-inventory", isAuthenticated, moveToInventory);
-router.delete("/bulk-delete", isAuthenticated, bulkDelete);
 
 
 
