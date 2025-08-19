@@ -18,7 +18,8 @@ const {
   updateInventoryStatus,
   getInventoryProcesses,
   outFinishGoods,
-  receiveByInventory
+  receiveByInventory,
+  bulkDelete
 } = require("../controllers/process");
 const router = express.Router();
 
@@ -40,6 +41,7 @@ router.route("/:_id")
 router.post("/update-inventory-status", isAuthenticated, updateInventoryStatus);
 router.put("/update-status", updateStatus);
 router.post("/move-to-inventory", isAuthenticated, moveToInventory);
+router.delete("/bulk-delete", isAuthenticated, bulkDelete);
 
 
 

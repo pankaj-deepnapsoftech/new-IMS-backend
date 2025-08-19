@@ -782,6 +782,21 @@ exports.updateInventoryStatus = TryCatch(async (req, res) => {
 
 
 
+exports.bulkDelete = TryCatch(async (req, res) => {
+  const { ids } = req.body; // Expecting an array of IDs to delete
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new ErrorHandler("No IDs provided for bulk delete", 400);
+  }
 
+  const result = await ProductionProcess.deleteMany({ _id: { $in: ids } });
+  
+  if (result.deletedCount === 0) {
+    throw new ErrorHandler("No production processes found for the provided IDs", 404);
+  }
 
+  res.status(200).json({
+    success: true,
+    message: `${result.deletedCount} production processes deleted successfully`,
+  });
+});
 

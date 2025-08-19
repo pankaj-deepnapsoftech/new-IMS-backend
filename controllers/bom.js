@@ -1,5 +1,5 @@
 //bom controller
-const mongoose = require('mongoose')
+const mongoose = require("mongoose");
 const BOM = require("../models/bom");
 const BOMFinishedMaterial = require("../models/bom-finished-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
@@ -31,15 +31,14 @@ exports.create = TryCatch(async (req, res) => {
     remarks,
     sales,
     resources,
-    manpower 
+    manpower,
   } = req.body;
 
-  
   const manpowerData = Array.isArray(manpower)
-    ? manpower.map(mp => ({
-      user: mp.user || null,
-      number: String(mp.number ?? "0")
-    }))
+    ? manpower.map((mp) => ({
+        user: mp.user || null,
+        number: String(mp.number ?? "0"),
+      }))
     : [];
 
   let insuffientStockMsg = "";
@@ -72,7 +71,8 @@ exports.create = TryCatch(async (req, res) => {
       if (!isProdExists) {
         throw new ErrorHandler(`Raw material doesn't exist`, 400);
       }
-      const quantityDifference = material.quantity - (isProdExists.current_stock || 0);
+      const quantityDifference =
+        material.quantity - (isProdExists.current_stock || 0);
       if (quantityDifference > 0) {
         insuffientStockMsg += ` Insufficient stock of ${isProdExists.name}`;
         shortages.push({
@@ -87,7 +87,7 @@ exports.create = TryCatch(async (req, res) => {
     finished_good;
 
   const totalRawMaterialDecrease = raw_materials
-    .filter(material => material.quantity < 0)
+    .filter((material) => material.quantity < 0)
     .reduce((sum, material) => sum + Math.abs(material.quantity), 0);
 
   const adjustedFinishedGoodQuantity = quantity + totalRawMaterialDecrease;
@@ -120,7 +120,7 @@ exports.create = TryCatch(async (req, res) => {
     remarks,
     resources,
     manpower: manpowerData, // ✅ use processed manpower here
-    sale_id: sales // Add sale_id from request body
+    sale_id: sales, // Add sale_id from request body
   });
 
   if (raw_materials) {
@@ -131,7 +131,9 @@ exports.create = TryCatch(async (req, res) => {
           bom: bom._id,
         });
 
-        const shortage = shortages.find(s => s.item.toString() === material.item.toString());
+        const shortage = shortages.find(
+          (s) => s.item.toString() === material.item.toString()
+        );
         if (shortage) {
           await InventoryShortage.create({
             bom: bom._id,
@@ -181,7 +183,6 @@ exports.create = TryCatch(async (req, res) => {
   });
 });
 
-
 exports.update = TryCatch(async (req, res) => {
   const { id } = req.params;
   const {
@@ -196,7 +197,7 @@ exports.update = TryCatch(async (req, res) => {
     other_charges,
     remarks,
     resources,
-    manpower // <-- raw manpower from request
+    manpower, // <-- raw manpower from request
   } = req.body;
 
   if (!id) {
@@ -232,7 +233,8 @@ exports.update = TryCatch(async (req, res) => {
           if (!isProdExists) {
             throw new ErrorHandler(`Product doesn't exist`, 400);
           }
-          const quantityDifference = material.quantity - (isProdExists.current_stock || 0);
+          const quantityDifference =
+            material.quantity - (isProdExists.current_stock || 0);
           if (quantityDifference > 0) {
             insuffientStockMsg += ` Insufficient stock of ${isProdExists.name}`;
             shortages.push({
@@ -249,7 +251,9 @@ exports.update = TryCatch(async (req, res) => {
   if (scrap_materials) {
     await Promise.all(
       scrap_materials.map(async (material) => {
-        const isScrapMaterialExists = await BOMScrapMaterial.findById(material._id);
+        const isScrapMaterialExists = await BOMScrapMaterial.findById(
+          material._id
+        );
         if (isScrapMaterialExists) {
           const isProdExists = await Product.findById(material.item);
           if (!isProdExists) {
@@ -267,11 +271,13 @@ exports.update = TryCatch(async (req, res) => {
     }
 
     const totalRawMaterialDecrease = raw_materials
-      ? raw_materials.filter(material => material.quantity < 0)
-        .reduce((sum, material) => sum + Math.abs(material.quantity), 0)
+      ? raw_materials
+          .filter((material) => material.quantity < 0)
+          .reduce((sum, material) => sum + Math.abs(material.quantity), 0)
       : 0;
 
-    const adjustedFinishedGoodQuantity = finished_good.quantity + totalRawMaterialDecrease;
+    const adjustedFinishedGoodQuantity =
+      finished_good.quantity + totalRawMaterialDecrease;
 
     bom.finished_good.quantity = adjustedFinishedGoodQuantity;
     bom.finished_good.cost = finished_good.cost;
@@ -285,7 +291,9 @@ exports.update = TryCatch(async (req, res) => {
   if (raw_materials) {
     await Promise.all(
       raw_materials.map(async (material) => {
-        const isExistingRawMaterial = await BOMRawMaterial.findById(material._id);
+        const isExistingRawMaterial = await BOMRawMaterial.findById(
+          material._id
+        );
         if (isExistingRawMaterial) {
           isExistingRawMaterial.item = material.item;
           isExistingRawMaterial.description = material?.description;
@@ -296,7 +304,9 @@ exports.update = TryCatch(async (req, res) => {
           isExistingRawMaterial.total_part_cost = material?.total_part_cost;
           await isExistingRawMaterial.save();
 
-          const shortage = shortages.find(s => s.item.toString() === material.item.toString());
+          const shortage = shortages.find(
+            (s) => s.item.toString() === material.item.toString()
+          );
           if (shortage) {
             await InventoryShortage.findOneAndUpdate(
               { bom: bom._id, raw_material: material._id },
@@ -304,7 +314,10 @@ exports.update = TryCatch(async (req, res) => {
               { upsert: true, new: true }
             );
           } else {
-            await InventoryShortage.deleteOne({ bom: bom._id, raw_material: material._id });
+            await InventoryShortage.deleteOne({
+              bom: bom._id,
+              raw_material: material._id,
+            });
           }
         }
       })
@@ -314,7 +327,9 @@ exports.update = TryCatch(async (req, res) => {
   if (scrap_materials) {
     await Promise.all(
       scrap_materials.map(async (material) => {
-        const isExistingScrapMaterial = await BOMScrapMaterial.findById(material._id);
+        const isExistingScrapMaterial = await BOMScrapMaterial.findById(
+          material._id
+        );
         if (isExistingScrapMaterial) {
           isExistingScrapMaterial.item = material.item;
           isExistingScrapMaterial.description = material?.description;
@@ -333,11 +348,10 @@ exports.update = TryCatch(async (req, res) => {
     bom.remarks = remarks.trim();
   }
 
- 
   if (Array.isArray(manpower)) {
-    const manpowerData = manpower.map(mp => ({
+    const manpowerData = manpower.map((mp) => ({
       user: mp.user || null,
-      number: String(mp.number ?? "0")
+      number: String(mp.number ?? "0"),
     }));
     bom.manpower = manpowerData;
   }
@@ -372,7 +386,6 @@ exports.update = TryCatch(async (req, res) => {
     message: "BOM has been updated successfully",
   });
 });
-
 
 exports.remove = TryCatch(async (req, res) => {
   const { id } = req.params;
@@ -419,10 +432,10 @@ exports.details = TryCatch(async (req, res) => {
       path: "scrap_materials",
       populate: [{ path: "item" }],
     })
- 
+
     .populate({
       path: "resources.resource_id",
-      model: "Resource"
+      model: "Resource",
     });
 
   if (!bom) {
@@ -442,7 +455,6 @@ exports.all = TryCatch(async (req, res) => {
   const skip = (page - 1) * limit;
 
   const boms = await BOM.find({ approved: true })
-  
 
     .populate({
       path: "finished_good",
@@ -526,8 +538,6 @@ exports.unapproved = TryCatch(async (req, res) => {
   });
 });
 
-
-
 exports.autoBom = TryCatch(async (req, res) => {
   const ObjectId = mongoose.Types.ObjectId;
   console.log(req.query);
@@ -544,8 +554,8 @@ exports.autoBom = TryCatch(async (req, res) => {
         from: "bom-finished-materials",
         localField: "finished_good",
         foreignField: "_id",
-        as: "finished_good"
-      }
+        as: "finished_good",
+      },
     },
     { $unwind: "$finished_good" },
     {
@@ -553,41 +563,44 @@ exports.autoBom = TryCatch(async (req, res) => {
         from: "products",
         localField: "finished_good.item",
         foreignField: "_id",
-        as: "finished_good.item"
-      }
+        as: "finished_good.item",
+      },
     },
     { $unwind: "$finished_good.item" },
     {
       $match: {
-        "finished_good.item._id": new ObjectId(product_id)
-      }
+        "finished_good.item._id": new ObjectId(product_id),
+      },
     },
     {
       $project: {
-        _id: 1
-      }
-    }
+        _id: 1,
+      },
+    },
   ]);
 
   if (result.length === 0) {
     return res.status(400).json({
       status: 400,
       success: false,
-      boms: "BOM does not exists"
+      boms: "BOM does not exists",
     });
   }
 
   const originalBomDoc = await BOM.findById(result[0]._id)
-    .populate({ path: 'finished_good', populate: { path: 'item' } })
-    .populate({ path: 'raw_materials', populate: { path: 'item' } })
-    .populate({ path: 'scrap_materials', populate: { path: 'item' } });
+    .populate({ path: "finished_good", populate: { path: "item" } })
+    .populate({ path: "raw_materials", populate: { path: "item" } })
+    .populate({ path: "scrap_materials", populate: { path: "item" } });
 
   // Prepare new BOM object in memory (not saved to DB)
   const newFinishedGood = {
     ...originalBomDoc.finished_good.toObject(),
     _id: new mongoose.Types.ObjectId(),
     quantity: QUANTITY,
-    cost: Math.round(((price || originalBomDoc?.finished_good?.item?.price) * QUANTITY) * 100) / 100 // Round to 2 decimal places
+    cost:
+      Math.round(
+        (price || originalBomDoc?.finished_good?.item?.price) * QUANTITY * 100
+      ) / 100, // Round to 2 decimal places
   };
   const prod = await Product.findById(newFinishedGood.item);
   newFinishedGood.item = prod;
@@ -596,7 +609,7 @@ exports.autoBom = TryCatch(async (req, res) => {
     ...originalBomDoc.toObject(),
     finished_good: newFinishedGood,
     raw_materials: undefined, // will be replaced with newRawMaterials
-    scrap_materials: undefined // will be replaced with newScrapMaterials
+    scrap_materials: undefined, // will be replaced with newScrapMaterials
   };
 
   const oldFinishedGoodQty = originalBomDoc.finished_good.quantity;
@@ -605,28 +618,30 @@ exports.autoBom = TryCatch(async (req, res) => {
   // Prepare new raw materials
   const newRawMaterials = originalBomDoc.raw_materials.map((rm) => {
     const unitQty = rm.quantity / oldFinishedGoodQty;
-    const unitPrice = rm.quantity > 0 ? (rm.total_part_cost || 0) / rm.quantity : 0;
+    const unitPrice =
+      rm.quantity > 0 ? (rm.total_part_cost || 0) / rm.quantity : 0;
     const newQty = unitQty * newFinishedGoodQty;
     return {
       ...rm.toObject(),
       _id: new mongoose.Types.ObjectId(),
       quantity: Math.round(newQty * 100) / 100,
-      total_part_cost: Math.round((unitPrice * newQty) * 100) / 100,
-      bom: undefined
+      total_part_cost: Math.round(unitPrice * newQty * 100) / 100,
+      bom: undefined,
     };
   });
 
   // Prepare new scrap materials
   const newScrapMaterials = originalBomDoc.scrap_materials.map((sc) => {
     const unitQty = sc.quantity / oldFinishedGoodQty;
-    const unitPrice = sc.quantity > 0 ? (sc.total_part_cost || 0) / sc.quantity : 0;
+    const unitPrice =
+      sc.quantity > 0 ? (sc.total_part_cost || 0) / sc.quantity : 0;
     const newQty = unitQty * newFinishedGoodQty;
     return {
       ...sc.toObject(),
       _id: new mongoose.Types.ObjectId(),
       quantity: Math.round(newQty * 100) / 100,
-      total_part_cost: Math.round((unitPrice * newQty) * 100) / 100,
-      bom: undefined
+      total_part_cost: Math.round(unitPrice * newQty * 100) / 100,
+      bom: undefined,
     };
   });
 
@@ -638,7 +653,7 @@ exports.autoBom = TryCatch(async (req, res) => {
     ...newBomDoc,
     bom_id: bomId, // <-- Auto-generated BOM ID
     raw_materials: [],
-    scrap_materials: []
+    scrap_materials: [],
   };
 
   delete bomWithoutMaterials._id;
@@ -648,7 +663,7 @@ exports.autoBom = TryCatch(async (req, res) => {
 
   // Create BOMFinishedMaterial document
   const createdFinishedGood = await BOMFinishedMaterial.create({
-    ...newBomDoc.finished_good
+    ...newBomDoc.finished_good,
   });
 
   // Create BOMRawMaterial documents
@@ -656,7 +671,7 @@ exports.autoBom = TryCatch(async (req, res) => {
     newRawMaterials.map(async (rm) => {
       const rawMaterial = await BOMRawMaterial.create({
         ...rm,
-        bom: savedBom._id
+        bom: savedBom._id,
       });
       return rawMaterial._id;
     })
@@ -667,14 +682,17 @@ exports.autoBom = TryCatch(async (req, res) => {
     newScrapMaterials.map(async (sm) => {
       const scrapMaterial = await BOMScrapMaterial.create({
         ...sm,
-        bom: savedBom._id
+        bom: savedBom._id,
       });
       return scrapMaterial._id;
     })
   );
 
   // Calculate total cost
-  const rawMaterialsTotalCost = newRawMaterials.reduce((sum, rm) => sum + (rm.total_part_cost || 0), 0);
+  const rawMaterialsTotalCost = newRawMaterials.reduce(
+    (sum, rm) => sum + (rm.total_part_cost || 0),
+    0
+  );
   const totalCost = Math.round(rawMaterialsTotalCost * 100) / 100;
 
   // Update the saved BOM
@@ -689,11 +707,9 @@ exports.autoBom = TryCatch(async (req, res) => {
     success: true,
     boms: "orignia",
     originalBomDoc: originalBomDoc,
-    newBomDoc: newBomDoc
+    newBomDoc: newBomDoc,
   });
 });
-
-
 
 exports.findFinishedGoodBom = TryCatch(async (req, res) => {
   const { _id } = req.params;
@@ -800,12 +816,12 @@ exports.unapprovedRawMaterials = TryCatch(async (req, res) => {
     return {
       bom_id: prod.bom._id, // required to update status
       bom_name: prod.bom.bom_name,
-      bom_status: prod.bom.production_process_status || "raw material approval pending", // optional fallback
+      bom_status:
+        prod.bom.production_process_status || "raw material approval pending", // optional fallback
       ...rm.item._doc,
       _id: prod._id, // raw material ID
     };
   });
-
 
   res.status(200).json({
     status: 200,
@@ -822,34 +838,34 @@ exports.approveRawMaterial = TryCatch(async (req, res) => {
     _id,
     {
       approvedByInventoryPersonnel: true,
-      isInventoryApprovalClicked: true // ✅ mark clicked for this raw material
+      isInventoryApprovalClicked: true, // ✅ mark clicked for this raw material
     },
     { new: true }
   );
-  if (!updatedRawMaterial) throw new ErrorHandler("Raw material not found", 404);
+  if (!updatedRawMaterial)
+    throw new ErrorHandler("Raw material not found", 404);
 
-  const requiredBom = await BOM.findById(updatedRawMaterial.bom).populate("raw_materials");
+  const requiredBom = await BOM.findById(updatedRawMaterial.bom).populate(
+    "raw_materials"
+  );
 
   const allApproved = requiredBom.raw_materials.every(
-    rm => rm.approvedByInventoryPersonnel
+    (rm) => rm.approvedByInventoryPersonnel
   );
 
   if (allApproved && requiredBom.production_process) {
-    await ProductionProcess.findByIdAndUpdate(
-      requiredBom.production_process,
-      { status: "Inventory Allocated" }
-    );
+    await ProductionProcess.findByIdAndUpdate(requiredBom.production_process, {
+      status: "Inventory Allocated",
+    });
   }
 
   res.status(200).json({
     status: 200,
     success: true,
     message: "Raw material approval updated",
-    rawMaterial: updatedRawMaterial
+    rawMaterial: updatedRawMaterial,
   });
 });
-
-
 
 exports.bomsGroupedByWeekDay = TryCatch(async (req, res) => {
   const allBoms = await BOM.find({ approved: true }).select(
@@ -897,9 +913,9 @@ exports.getInventoryShortages = TryCatch(async (req, res) => {
     .skip(skip)
     .limit(limit);
 
-  const formattedShortages = shortages.map(shortage => ({
-    bom_name: shortage.bom?.bom_name || 'Unknown BOM',
-    item_name: shortage.item?.name || 'Unknown Item',
+  const formattedShortages = shortages.map((shortage) => ({
+    bom_name: shortage.bom?.bom_name || "Unknown BOM",
+    item_name: shortage.item?.name || "Unknown Item",
     item: shortage.item?._id || null,
     shortage_quantity: shortage.shortage_quantity,
     current_stock: shortage.item?.current_stock || 0,
@@ -937,7 +953,9 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
 
     if (!bom || !bom.production_process) continue;
 
-    const productionProcess = await ProductionProcess.findById(bom.production_process);
+    const productionProcess = await ProductionProcess.findById(
+      bom.production_process
+    );
     if (!productionProcess) continue;
 
     const item = rm.item;
@@ -964,7 +982,7 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
       __v: rm.__v,
       change_type: rm.change_type,
       quantity_changed: rm.quantity_changed,
-      isInventoryApprovalClicked: rm.isInventoryApprovalClicked
+      isInventoryApprovalClicked: rm.isInventoryApprovalClicked,
     });
   }
 
@@ -1019,7 +1037,6 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
 //   });
 // });
 
-
 // // Approve / Move finished good to inventory
 // exports.approveFinishedGood = TryCatch(async (req, res) => {
 //   const { _id } = req.body;
@@ -1027,7 +1044,7 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
 
 //   const updatedFG = await BOMFinishedMaterial.findByIdAndUpdate(
 //     _id,
-//     { isInventoryReceived: true },  
+//     { isInventoryReceived: true },
 //     { new: true }
 //   );
 //   if (!updatedFG) throw new ErrorHandler("Finished good not found", 404);
@@ -1063,10 +1080,13 @@ exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
     } else if (ext === ".xlsx") {
       parsedData = parseExcelFile(req.file.path);
     } else {
-      throw new ErrorHandler("Unsupported file type. Please upload .csv or .xlsx", 400);
+      throw new ErrorHandler(
+        "Unsupported file type. Please upload .csv or .xlsx",
+        400
+      );
     }
 
-    fs.unlink(req.file.path, () => { }); // Remove uploaded file
+    fs.unlink(req.file.path, () => {}); // Remove uploaded file
 
     if (!Array.isArray(parsedData) || parsedData.length === 0) {
       throw new ErrorHandler("No valid data found in uploaded file", 400);
@@ -1093,13 +1113,19 @@ exports.bulkUploadBOMHandler = TryCatch(async (req, res) => {
         parsedRawMaterials = JSON.parse(raw_materials);
         if (!Array.isArray(parsedRawMaterials)) throw new Error();
       } catch (err) {
-        throw new ErrorHandler(`Invalid JSON format for raw_materials in BOM: ${bom_name}`, 400);
+        throw new ErrorHandler(
+          `Invalid JSON format for raw_materials in BOM: ${bom_name}`,
+          400
+        );
       }
 
       try {
         parsedFinishedGood = JSON.parse(finished_good);
       } catch (err) {
-        throw new ErrorHandler(`Invalid JSON format for finished_good in BOM: ${bom_name}`, 400);
+        throw new ErrorHandler(
+          `Invalid JSON format for finished_good in BOM: ${bom_name}`,
+          400
+        );
       }
 
       const createdFinishedGood = await BOMFinishedMaterial.create({
@@ -1161,16 +1187,16 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
   try {
     // Find BOM linked to this sales order - try different possible field names
     let bom = await BOM.findOne({ sale_id: salesOrderId });
-    
+
     if (!bom) {
       // Try alternative field names
       bom = await BOM.findOne({ sales_order: salesOrderId });
     }
-    
+
     if (!bom) {
       bom = await BOM.findOne({ purchase_id: salesOrderId });
     }
-    
+
     if (!bom) {
       bom = await BOM.findOne({ order_id: salesOrderId });
     }
@@ -1183,7 +1209,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
         details: [],
         totalMaterials: 0,
         approvedMaterials: 0,
-        pendingMaterials: 0
+        pendingMaterials: 0,
       });
     }
 
@@ -1206,13 +1232,15 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
         details: [],
         totalMaterials: 0,
         approvedMaterials: 0,
-        pendingMaterials: 0
+        pendingMaterials: 0,
       });
     }
 
     // Calculate overall status
     const totalMaterials = rawMaterials.length;
-    const approvedMaterials = rawMaterials.filter(rm => rm.isInventoryApprovalClicked).length;
+    const approvedMaterials = rawMaterials.filter(
+      (rm) => rm.isInventoryApprovalClicked
+    ).length;
     const pendingMaterials = totalMaterials - approvedMaterials;
 
     let overallStatus = "Pending";
@@ -1222,7 +1250,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
       overallStatus = "Partially Approved";
     }
 
-    const details = rawMaterials.map(rm => ({
+    const details = rawMaterials.map((rm) => ({
       _id: rm._id,
       product_id: rm.item?.product_id,
       name: rm.item?.name,
@@ -1231,7 +1259,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
       current_stock: rm.item?.current_stock,
       price: rm.item?.price,
       approved: rm.isInventoryApprovalClicked,
-      isInventoryApprovalClicked: rm.isInventoryApprovalClicked
+      isInventoryApprovalClicked: rm.isInventoryApprovalClicked,
     }));
 
     res.status(200).json({
@@ -1241,7 +1269,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
       totalMaterials,
       approvedMaterials,
       pendingMaterials,
-      details
+      details,
     });
   } catch (error) {
     console.error("Error in getInventoryApprovalStatus:", error);
@@ -1249,7 +1277,7 @@ exports.getInventoryApprovalStatus = TryCatch(async (req, res) => {
       status: 500,
       success: false,
       message: "Internal server error",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -1294,18 +1322,23 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
     }
 
     // Validate if salesOrderId is a valid ObjectId format
-    if (!salesOrderId || salesOrderId === "YOUR_SALES_ORDER_ID" || salesOrderId.length !== 24) {
+    if (
+      !salesOrderId ||
+      salesOrderId === "YOUR_SALES_ORDER_ID" ||
+      salesOrderId.length !== 24
+    ) {
       return res.status(400).json({
         status: 400,
         success: false,
-        message: "Invalid sales order ID format. Please provide a valid 24-character ID or 'all' for all sales orders.",
-        salesOrderId: salesOrderId
+        message:
+          "Invalid sales order ID format. Please provide a valid 24-character ID or 'all' for all sales orders.",
+        salesOrderId: salesOrderId,
       });
     }
 
     // First, check if the provided ID is a BOM ID itself
     let bom = await BOM.findById(salesOrderId);
-    
+
     // If not found as BOM ID, try to find BOM linked to this sales order
     if (!bom) {
       bom = await BOM.findOne({ sale_id: salesOrderId });
@@ -1331,7 +1364,7 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
         canApproveInventory: false,
         canRequestInventory: false,
         canOutAllotInventory: false,
-        canStartProduction: false
+        canStartProduction: false,
       });
     }
 
@@ -1350,19 +1383,21 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
         canApproveInventory: false,
         canRequestInventory: false,
         canOutAllotInventory: false,
-        canStartProduction: false
+        canStartProduction: false,
       });
     }
 
     // Get production process if exists
     let productionProcess = null;
     if (bom.production_process) {
-      productionProcess = await ProductionProcess.findById(bom.production_process)
-        .populate('creator', 'first_name last_name email')
-        .populate('item', 'name product_id')
-        .populate('rm_store', 'name')
-        .populate('fg_store', 'name')
-        .populate('scrap_store', 'name');
+      productionProcess = await ProductionProcess.findById(
+        bom.production_process
+      )
+        .populate("creator", "first_name last_name email")
+        .populate("item", "name product_id")
+        .populate("rm_store", "name")
+        .populate("fg_store", "name")
+        .populate("scrap_store", "name");
     }
 
     // Get all raw materials for this BOM
@@ -1378,7 +1413,9 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
 
     // Calculate inventory status
     const totalMaterials = rawMaterials.length;
-    const approvedMaterials = rawMaterials.filter(rm => rm.isInventoryApprovalClicked).length;
+    const approvedMaterials = rawMaterials.filter(
+      (rm) => rm.isInventoryApprovalClicked
+    ).length;
     const pendingMaterials = totalMaterials - approvedMaterials;
 
     let inventoryStatus = "Pending";
@@ -1398,7 +1435,10 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
 
     // Determine overall status
     let overallStatus = "Pending";
-    if (inventoryStatus === "Approved" && productionStatus === "inventory allocated") {
+    if (
+      inventoryStatus === "Approved" &&
+      productionStatus === "inventory allocated"
+    ) {
       overallStatus = "Ready for Production";
     } else if (productionStatus === "production started") {
       overallStatus = "Production Started";
@@ -1414,12 +1454,19 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
 
     // Determine available actions
     const canCreateBOM = !bom;
-    const canApproveInventory = inventoryStatus !== "Approved" && totalMaterials > 0;
-    const canRequestInventory = inventoryStatus === "Approved" && (!productionProcess || productionProcess.status === "raw material approval pending");
-    const canOutAllotInventory = productionProcess && productionProcess.status === "request for allow inventory";
-    const canStartProduction = productionProcess && productionProcess.status === "inventory in transit";
+    const canApproveInventory =
+      inventoryStatus !== "Approved" && totalMaterials > 0;
+    const canRequestInventory =
+      inventoryStatus === "Approved" &&
+      (!productionProcess ||
+        productionProcess.status === "raw material approval pending");
+    const canOutAllotInventory =
+      productionProcess &&
+      productionProcess.status === "request for allow inventory";
+    const canStartProduction =
+      productionProcess && productionProcess.status === "inventory in transit";
 
-    const inventoryDetails = rawMaterials.map(rm => ({
+    const inventoryDetails = rawMaterials.map((rm) => ({
       _id: rm._id,
       product_id: rm.item?.product_id,
       name: rm.item?.name,
@@ -1435,27 +1482,31 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
       total_part_cost: rm.total_part_cost,
       in_production: rm.in_production,
       approvedByAdmin: rm.approvedByAdmin,
-      approvedByInventoryPersonnel: rm.approvedByInventoryPersonnel
+      approvedByInventoryPersonnel: rm.approvedByInventoryPersonnel,
     }));
 
-    const productionDetails = productionProcess ? {
-      _id: productionProcess._id,
-      process_id: productionProcess.process_id || productionProcess._id,
-      process_name: productionProcess.process_name || `Production Process ${productionProcess._id}`,
-      status: productionProcess.status,
-      quantity: productionProcess.quantity,
-      creator: productionProcess.creator,
-      item: productionProcess.item,
-      rm_store: productionProcess.rm_store,
-      fg_store: productionProcess.fg_store,
-      scrap_store: productionProcess.scrap_store,
-      processes: productionProcess.processes,
-      raw_materials: productionProcess.raw_materials,
-      scrap_materials: productionProcess.scrap_materials,
-      finished_good: productionProcess.finished_good,
-      createdAt: productionProcess.createdAt,
-      updatedAt: productionProcess.updatedAt
-    } : null;
+    const productionDetails = productionProcess
+      ? {
+          _id: productionProcess._id,
+          process_id: productionProcess.process_id || productionProcess._id,
+          process_name:
+            productionProcess.process_name ||
+            `Production Process ${productionProcess._id}`,
+          status: productionProcess.status,
+          quantity: productionProcess.quantity,
+          creator: productionProcess.creator,
+          item: productionProcess.item,
+          rm_store: productionProcess.rm_store,
+          fg_store: productionProcess.fg_store,
+          scrap_store: productionProcess.scrap_store,
+          processes: productionProcess.processes,
+          raw_materials: productionProcess.raw_materials,
+          scrap_materials: productionProcess.scrap_materials,
+          finished_good: productionProcess.finished_good,
+          createdAt: productionProcess.createdAt,
+          updatedAt: productionProcess.updatedAt,
+        }
+      : null;
 
     res.status(200).json({
       status: 200,
@@ -1484,7 +1535,7 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
         processes: bom.processes,
         other_charges: bom.other_charges,
         createdAt: bom.createdAt,
-        updatedAt: bom.updatedAt
+        updatedAt: bom.updatedAt,
       },
       inventoryStatus,
       productionStatus,
@@ -1500,16 +1551,16 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
       canStartProduction,
       bomId: bom._id,
       productionProcessId: productionProcess?._id,
-      productionProcessName: productionProcess?.process_name || productionProcess?._id || "N/A"
+      productionProcessName:
+        productionProcess?.process_name || productionProcess?._id || "N/A",
     });
-
   } catch (error) {
     console.error("Error in getSalesOrderStatus:", error);
     res.status(500).json({
       status: 500,
       success: false,
       message: "Internal server error",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -1518,14 +1569,14 @@ exports.getSalesOrderStatus = TryCatch(async (req, res) => {
 exports.getAllBOMs = TryCatch(async (req, res) => {
   try {
     const allBOMs = await BOM.find({})
-      .populate('finished_good')
-      .populate('creator', 'first_name last_name email')
+      .populate("finished_good")
+      .populate("creator", "first_name last_name email")
       .sort({ createdAt: -1 });
 
     // Get all sales orders to link with BOMs
     const allSalesOrders = await Purchase.find({})
-      .populate('party')
-      .populate('product_id')
+      .populate("party")
+      .populate("product_id")
       .sort({ createdAt: -1 });
 
     const bomDetails = allBOMs.map((bom, index) => {
@@ -1537,7 +1588,7 @@ exports.getAllBOMs = TryCatch(async (req, res) => {
         // bom.sale_id = sale_id;
         // bom.save();
       }
-      
+
       return {
         _id: bom._id,
         bom_id: bom.bom_id,
@@ -1547,7 +1598,7 @@ exports.getAllBOMs = TryCatch(async (req, res) => {
         approved: bom.approved,
         creator: bom.creator,
         finished_good: bom.finished_good,
-        createdAt: bom.createdAt
+        createdAt: bom.createdAt,
       };
     });
 
@@ -1557,7 +1608,7 @@ exports.getAllBOMs = TryCatch(async (req, res) => {
       message: "All BOMs fetched successfully",
       totalBOMs: allBOMs.length,
       totalSalesOrders: allSalesOrders.length,
-      boms: bomDetails
+      boms: bomDetails,
     });
   } catch (error) {
     console.error("Error in getAllBOMs:", error);
@@ -1565,7 +1616,7 @@ exports.getAllBOMs = TryCatch(async (req, res) => {
       status: 500,
       success: false,
       message: "Internal server error",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -1575,8 +1626,8 @@ const getAllSalesOrdersStatus = async (req, res) => {
   try {
     // Get all sales orders (purchases)
     const allSalesOrders = await Purchase.find({})
-      .populate('party')
-      .populate('product_id')
+      .populate("party")
+      .populate("product_id")
       .sort({ createdAt: -1 });
 
     if (!allSalesOrders || allSalesOrders.length === 0) {
@@ -1585,35 +1636,37 @@ const getAllSalesOrdersStatus = async (req, res) => {
         success: true,
         message: "No sales orders found",
         totalSalesOrders: 0,
-        salesOrdersStatus: []
+        salesOrdersStatus: [],
       });
     }
 
     // Get all BOMs
     const allBOMs = await BOM.find({})
-      .populate('finished_good')
-      .populate('raw_materials')
-      .populate('scrap_materials')
-      .populate('resources.resource_id')
-      .populate('creator', 'first_name last_name email')
-      .populate('approved_by', 'first_name last_name email');
+      .populate("finished_good")
+      .populate("raw_materials")
+      .populate("scrap_materials")
+      .populate("resources.resource_id")
+      .populate("creator", "first_name last_name email")
+      .populate("approved_by", "first_name last_name email");
 
     // Get all production processes
     const allProductionProcesses = await ProductionProcess.find({})
-      .populate('creator', 'first_name last_name email')
-      .populate('item', 'name product_id')
-      .populate('rm_store', 'name')
-      .populate('fg_store', 'name')
-      .populate('scrap_store', 'name');
+      .populate("creator", "first_name last_name email")
+      .populate("item", "name product_id")
+      .populate("rm_store", "name")
+      .populate("fg_store", "name")
+      .populate("scrap_store", "name");
 
     // Get all raw materials
     const allRawMaterials = await BOMRawMaterial.find({})
-      .populate('item')
-      .populate('bom');
+      .populate("item")
+      .populate("bom");
 
     console.log(`Total BOMs found: ${allBOMs.length}`);
     console.log(`Total Sales Orders found: ${allSalesOrders.length}`);
-    console.log(`Total Production Processes found: ${allProductionProcesses.length}`);
+    console.log(
+      `Total Production Processes found: ${allProductionProcesses.length}`
+    );
     console.log(`Total Raw Materials found: ${allRawMaterials.length}`);
 
     const salesOrdersStatus = [];
@@ -1622,26 +1675,29 @@ const getAllSalesOrdersStatus = async (req, res) => {
     for (const salesOrder of allSalesOrders) {
       // Find BOM for this sales order
       let bom = null;
-      
+
       // Check if sales order ID is a BOM ID itself
       bom = await BOM.findById(salesOrder._id);
-      
+
       // Check by sale_id
       if (!bom) {
         bom = await BOM.findOne({ sale_id: salesOrder._id });
       }
-      
+
       // Find BOM linked to this sales order (using existing BOMs array)
-      let linkedBom = allBOMs.find(b => 
-        b.sale_id?.toString() === salesOrder._id.toString() ||
-        b.sales_order?.toString() === salesOrder._id.toString() ||
-        b.purchase_id?.toString() === salesOrder._id.toString() ||
-        b.order_id?.toString() === salesOrder._id.toString()
+      let linkedBom = allBOMs.find(
+        (b) =>
+          b.sale_id?.toString() === salesOrder._id.toString() ||
+          b.sales_order?.toString() === salesOrder._id.toString() ||
+          b.purchase_id?.toString() === salesOrder._id.toString() ||
+          b.order_id?.toString() === salesOrder._id.toString()
       );
 
       // If no BOM found by sale_id, try to assign a BOM by index
       if (!linkedBom && allBOMs.length > 0) {
-        const salesOrderIndex = allSalesOrders.findIndex(so => so._id.toString() === salesOrder._id.toString());
+        const salesOrderIndex = allSalesOrders.findIndex(
+          (so) => so._id.toString() === salesOrder._id.toString()
+        );
         if (salesOrderIndex >= 0 && salesOrderIndex < allBOMs.length) {
           linkedBom = allBOMs[salesOrderIndex];
         }
@@ -1651,8 +1707,6 @@ const getAllSalesOrdersStatus = async (req, res) => {
         bom = linkedBom; // Use the found BOM
       }
 
-
-
       // If no BOM found, create basic status
       if (!bom) {
         salesOrdersStatus.push({
@@ -1660,7 +1714,7 @@ const getAllSalesOrdersStatus = async (req, res) => {
           salesOrderNumber: salesOrder.order_id || salesOrder._id,
           buyerName: salesOrder.party?.name || "N/A",
           sellerName: "N/A", // Purchase model doesn't have seller
-          totalAmount: (salesOrder.price * salesOrder.product_qty) || 0,
+          totalAmount: salesOrder.price * salesOrder.product_qty || 0,
           orderDate: salesOrder.createdAt,
           overallStatus: "No BOM assigned",
           bomStatus: "Not Created",
@@ -1679,24 +1733,26 @@ const getAllSalesOrdersStatus = async (req, res) => {
           canOutAllotInventory: false,
           canStartProduction: false,
           productionProcessId: null,
-          productionProcessName: "N/A"
+          productionProcessName: "N/A",
         });
         continue;
       }
 
       // Find production process for this BOM
-      const productionProcess = allProductionProcesses.find(pp => 
-        pp._id.toString() === bom.production_process?.toString()
+      const productionProcess = allProductionProcesses.find(
+        (pp) => pp._id.toString() === bom.production_process?.toString()
       );
 
       // Get raw materials for this BOM
-      const rawMaterials = allRawMaterials.filter(rm => 
-        rm.bom._id.toString() === bom._id.toString()
+      const rawMaterials = allRawMaterials.filter(
+        (rm) => rm.bom._id.toString() === bom._id.toString()
       );
 
       // Calculate inventory status
       const totalMaterials = rawMaterials.length;
-      const approvedMaterials = rawMaterials.filter(rm => rm.isInventoryApprovalClicked).length;
+      const approvedMaterials = rawMaterials.filter(
+        (rm) => rm.isInventoryApprovalClicked
+      ).length;
       const pendingMaterials = totalMaterials - approvedMaterials;
 
       let inventoryStatus = "Pending";
@@ -1716,7 +1772,10 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       // Determine overall status
       let overallStatus = "Pending";
-      if (inventoryStatus === "Approved" && productionStatus === "inventory allocated") {
+      if (
+        inventoryStatus === "Approved" &&
+        productionStatus === "inventory allocated"
+      ) {
         overallStatus = "Ready for Production";
       } else if (productionStatus === "production started") {
         overallStatus = "Production Started";
@@ -1732,12 +1791,20 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       // Determine available actions
       const canCreateBOM = false; // BOM already exists
-      const canApproveInventory = inventoryStatus !== "Approved" && totalMaterials > 0;
-      const canRequestInventory = inventoryStatus === "Approved" && (!productionProcess || productionProcess.status === "raw material approval pending");
-      const canOutAllotInventory = productionProcess && productionProcess.status === "request for allow inventory";
-      const canStartProduction = productionProcess && productionProcess.status === "inventory in transit";
+      const canApproveInventory =
+        inventoryStatus !== "Approved" && totalMaterials > 0;
+      const canRequestInventory =
+        inventoryStatus === "Approved" &&
+        (!productionProcess ||
+          productionProcess.status === "raw material approval pending");
+      const canOutAllotInventory =
+        productionProcess &&
+        productionProcess.status === "request for allow inventory";
+      const canStartProduction =
+        productionProcess &&
+        productionProcess.status === "inventory in transit";
 
-      const inventoryDetails = rawMaterials.map(rm => ({
+      const inventoryDetails = rawMaterials.map((rm) => ({
         _id: rm._id,
         product_id: rm.item?.product_id,
         name: rm.item?.name,
@@ -1753,34 +1820,38 @@ const getAllSalesOrdersStatus = async (req, res) => {
         total_part_cost: rm.total_part_cost,
         in_production: rm.in_production,
         approvedByAdmin: rm.approvedByAdmin,
-        approvedByInventoryPersonnel: rm.approvedByInventoryPersonnel
+        approvedByInventoryPersonnel: rm.approvedByInventoryPersonnel,
       }));
 
-      const productionDetails = productionProcess ? {
-        _id: productionProcess._id,
-        process_id: productionProcess.process_id || productionProcess._id,
-        process_name: productionProcess.process_name || `Production Process ${productionProcess._id}`,
-        status: productionProcess.status,
-        quantity: productionProcess.quantity,
-        creator: productionProcess.creator,
-        item: productionProcess.item,
-        rm_store: productionProcess.rm_store,
-        fg_store: productionProcess.fg_store,
-        scrap_store: productionProcess.scrap_store,
-        processes: productionProcess.processes,
-        raw_materials: productionProcess.raw_materials,
-        scrap_materials: productionProcess.scrap_materials,
-        finished_good: productionProcess.finished_good,
-        createdAt: productionProcess.createdAt,
-        updatedAt: productionProcess.updatedAt
-      } : null;
+      const productionDetails = productionProcess
+        ? {
+            _id: productionProcess._id,
+            process_id: productionProcess.process_id || productionProcess._id,
+            process_name:
+              productionProcess.process_name ||
+              `Production Process ${productionProcess._id}`,
+            status: productionProcess.status,
+            quantity: productionProcess.quantity,
+            creator: productionProcess.creator,
+            item: productionProcess.item,
+            rm_store: productionProcess.rm_store,
+            fg_store: productionProcess.fg_store,
+            scrap_store: productionProcess.scrap_store,
+            processes: productionProcess.processes,
+            raw_materials: productionProcess.raw_materials,
+            scrap_materials: productionProcess.scrap_materials,
+            finished_good: productionProcess.finished_good,
+            createdAt: productionProcess.createdAt,
+            updatedAt: productionProcess.updatedAt,
+          }
+        : null;
 
       salesOrdersStatus.push({
         salesOrderId: salesOrder._id,
         salesOrderNumber: salesOrder.order_id || salesOrder._id,
         buyerName: salesOrder.party?.name || "N/A",
         sellerName: "N/A", // Purchase model doesn't have seller
-        totalAmount: (salesOrder.price * salesOrder.product_qty) || 0,
+        totalAmount: salesOrder.price * salesOrder.product_qty || 0,
         orderDate: salesOrder.createdAt,
         overallStatus,
         bomStatus: bom.approved ? "Approved" : "Pending",
@@ -1800,7 +1871,8 @@ const getAllSalesOrdersStatus = async (req, res) => {
         canStartProduction,
         bomId: bom._id,
         productionProcessId: productionProcess?._id,
-        productionProcessName: productionProcess?.process_name || productionProcess?._id || "N/A",
+        productionProcessName:
+          productionProcess?.process_name || productionProcess?._id || "N/A",
         bomDetails: {
           _id: bom._id,
           bom_id: bom.bom_id,
@@ -1820,16 +1892,20 @@ const getAllSalesOrdersStatus = async (req, res) => {
           processes: bom.processes,
           other_charges: bom.other_charges,
           createdAt: bom.createdAt,
-          updatedAt: bom.updatedAt
-        }
+          updatedAt: bom.updatedAt,
+        },
       });
     }
 
     // Count how many sales orders have BOMs assigned
-    const salesOrdersWithBOMs = salesOrdersStatus.filter(status => status.bomStatus !== "Not Created").length;
-    
-    console.log(`Sales Orders with BOMs: ${salesOrdersWithBOMs}/${salesOrdersStatus.length}`);
-    
+    const salesOrdersWithBOMs = salesOrdersStatus.filter(
+      (status) => status.bomStatus !== "Not Created"
+    ).length;
+
+    console.log(
+      `Sales Orders with BOMs: ${salesOrdersWithBOMs}/${salesOrdersStatus.length}`
+    );
+
     res.status(200).json({
       status: 200,
       success: true,
@@ -1839,18 +1915,89 @@ const getAllSalesOrdersStatus = async (req, res) => {
       totalBOMs: allBOMs.length,
       totalRawMaterials: allRawMaterials.length,
       salesOrdersWithBOMs,
-      salesOrdersStatus
+      salesOrdersStatus,
     });
-
   } catch (error) {
     console.error("Error in getAllSalesOrdersStatus:", error);
     res.status(500).json({
       status: 500,
       success: false,
       message: "Internal server error",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
 // All functions are already exported using exports.functionName syntax above
+
+exports.bulkRemove = TryCatch(async (req, res) => {
+  const { ids } = req.body;
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    throw new ErrorHandler("No BOM IDs provided for bulk delete", 400);
+  }
+
+  // First, find all BOMs to get their related materials
+  const bomsToDelete = await BOM.find({ _id: { $in: ids } });
+
+  if (bomsToDelete.length === 0) {
+    return res.status(404).json({
+      status: 404,
+      success: false,
+      message: "No BOMs found with the provided IDs",
+    });
+  }
+
+  // Collect all raw materials, finished goods, and scrap materials IDs for cleanup
+  const rawMaterialIds = [];
+  const finishedGoodIds = [];
+  const scrapMaterialIds = [];
+
+  bomsToDelete.forEach((bom) => {
+    // Collect raw materials IDs
+    if (bom.raw_materials && bom.raw_materials.length > 0) {
+      rawMaterialIds.push(...bom.raw_materials.map((material) => material._id));
+    }
+
+    // Collect finished good ID
+    if (bom.finished_good) {
+      finishedGoodIds.push(bom.finished_good._id);
+    }
+
+    // Collect scrap materials IDs
+    if (bom.scrap_materials && bom.scrap_materials.length > 0) {
+      scrapMaterialIds.push(
+        ...bom.scrap_materials.map((material) => material._id)
+      );
+    }
+  });
+
+  // Perform cleanup operations
+  await Promise.all([
+    // Delete related raw materials
+    rawMaterialIds.length > 0
+      ? BOMRawMaterial.deleteMany({ _id: { $in: rawMaterialIds } })
+      : Promise.resolve(),
+
+    // Delete related finished goods
+    finishedGoodIds.length > 0
+      ? BOMFinishedMaterial.deleteMany({ _id: { $in: finishedGoodIds } })
+      : Promise.resolve(),
+
+    // Delete related scrap materials
+    scrapMaterialIds.length > 0
+      ? BOMScrapMaterial.deleteMany({ _id: { $in: scrapMaterialIds } })
+      : Promise.resolve(),
+
+    // Delete inventory shortages
+    InventoryShortage.deleteMany({ bom: { $in: ids } }),
+  ]);
+
+  // Finally, delete the BOMs
+  const deletedBOMs = await BOM.deleteMany({ _id: { $in: ids } });
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: `${deletedBOMs.deletedCount} BOM(s) deleted successfully`,
+  });
+});

@@ -18,7 +18,7 @@ const PurchaseOrderSchema = new mongoose.Schema(
         quantity: { type: Number, required: true, min: 1 },
         unitPrice: { type: Number, default: 0 },
         totalPrice: { type: Number, default: 0 },
-        productId: { type: String }, // Add productId field to store the product ID
+        productId: { type: String },
       },
     ],
     // Legacy fields for backward compatibility
