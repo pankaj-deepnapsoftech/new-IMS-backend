@@ -240,9 +240,14 @@ exports.update = async (req, res) => {
       hasChanges = true;
       console.log("Finished good change detected!");
 
-      // ✅ Update actual value
+      // ✅ Update produced_quantity
       productionProcess.finished_good.produced_quantity = Number(currFG.produced_quantity) || 0;
+
+      // ✅ Also update remaining_quantity
+      productionProcess.finished_good.remaining_quantity =
+        (Number(prevFG.estimated_quantity) || 0) - (Number(currFG.produced_quantity) || 0);
     }
+
   }
 
   // Check if raw material quantities changed
@@ -272,7 +277,12 @@ exports.update = async (req, res) => {
 
           // ✅ Update actual value
           prevRm.used_quantity = currUsedQty;
+
+          // ✅ Also update remaining_quantity
+          prevRm.remaining_quantity =
+            (Number(prevRm.estimated_quantity) || 0) - currUsedQty;
         }
+
       }
     });
   }

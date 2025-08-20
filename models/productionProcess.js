@@ -46,9 +46,9 @@ const productionProcessSchema = new Schema(
         "request for allow inventory",//new
         "inventory in transit",//new
         "production started",//new
-         "moved to inventory",
-         "allocated finish goods",
-         "out finish goods",
+        "moved to inventory",
+        "allocated finish goods",
+        "out finish goods",
         "received",
         "dispatched"
       ],
@@ -75,8 +75,8 @@ const productionProcessSchema = new Schema(
             default: false,
           },
           work_done: {
-            type: Number,
-            default: 0,
+            type: String,
+            
           },
         },
       ],
@@ -95,6 +95,10 @@ const productionProcessSchema = new Schema(
             required: [true, "Estimated quantity is a required field"],
           },
           used_quantity: {
+            type: Number,
+            default: 0,
+          },
+           remaining_quantity: {
             type: Number,
             default: 0,
           },
@@ -135,6 +139,10 @@ const productionProcessSchema = new Schema(
       produced_quantity: {
         type: Number,
         default: 0,
+      },
+      remaining_quantity:{
+        type:Number,
+        default:0
       },
     },
   },
