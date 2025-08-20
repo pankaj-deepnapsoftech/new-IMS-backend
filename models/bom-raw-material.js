@@ -45,6 +45,10 @@ const BOMRawMaterialSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    uom_used_quantity: {
+      type: String,
+      default: "",
+    },
     approvedByInventoryPersonnel: {
       type: Boolean,
       default: false,
