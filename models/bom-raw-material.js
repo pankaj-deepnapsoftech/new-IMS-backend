@@ -53,6 +53,7 @@ const BOMRawMaterialSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    isOutForInventoryClicked: { type: Boolean, default: false },
   },
   {
     timestamps: true,

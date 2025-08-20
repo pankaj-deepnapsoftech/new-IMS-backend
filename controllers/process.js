@@ -586,26 +586,52 @@ exports.requestForAllocation = TryCatch(async (req, res) => {
   });
 });
 exports.markInventoryInTransit = TryCatch(async (req, res) => {
-  const { _id } = req.body; // Process ID
-  // console.log("Marking inventory in transit for process ID:", _id);
+   const { _id } = req.body; // Raw Material ID
+   console.log(_id)
   if (!_id) {
-    throw new ErrorHandler("Process ID is required", 400);
+    throw new ErrorHandler("Raw material ID is required", 400);
   }
 
-  const process = await ProductionProcess.findById(_id);
-  if (!process) {
-    throw new ErrorHandler("Production process not found", 404);
+  // 1️⃣ Update raw material
+  const updatedRawMaterial = await BOMRawMaterial.findByIdAndUpdate(
+    _id,
+    { isOutForInventoryClicked: true }, // ✅ new field
+    { new: true }
+  );
+
+  if (!updatedRawMaterial) {
+    throw new ErrorHandler("Raw material not found", 404);
   }
 
-  process.status = "inventory in transit";
-  await process.save();
+  // 2️⃣ Get related BOM with all raw materials
+  const requiredBom = await BOM.findById(updatedRawMaterial.bom)
+    .populate("raw_materials");
+
+  if (!requiredBom) {
+    throw new ErrorHandler("BOM not found", 404);
+  }
+
+  // 3️⃣ Check if all raw materials are out for inventory
+  const allOutForInventory = requiredBom.raw_materials.every(
+    rm => rm.isOutForInventoryClicked
+  );
+
+  // 4️⃣ If all are out, update production process
+  if (allOutForInventory && requiredBom.production_process) {
+    await ProductionProcess.findByIdAndUpdate(
+      requiredBom.production_process,
+      { status: "inventory in transit" }
+    );
+  }
 
   res.status(200).json({
     success: true,
-    message: "Status updated to 'inventory in transit'",
-    updated: process,
+    message: "Raw material marked out for inventory successfully",
+    rawMaterial: updatedRawMaterial,
+    allOutForInventory
   });
 });
+
 exports.startProduction = async (req, res) => {
   try {
     const { _id } = req.body; // production process ID
