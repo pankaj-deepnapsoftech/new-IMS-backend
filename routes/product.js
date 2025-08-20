@@ -21,6 +21,8 @@ const {
   clearUpdatedPrice,
   clearUpdatedStock,
   removeFromInventoryShortages,
+  updateShortageQuantity,
+  updateStockAndShortages,
 } = require("../controllers/product");
 const { isAuthenticated } = require("../middlewares/isAuthenticated");
 const { isSuper } = require("../middlewares/isSuper");
@@ -32,8 +34,8 @@ const router = express.Router();
 // CRUD operations
 router
   .route("/")
-  .post(isAuthenticated, isAllowed, create)
-  .put(isAuthenticated, isAllowed, update)
+  .post(isAuthenticated, create)
+  .put(isAuthenticated, update)
   .delete(isAuthenticated, isAllowed, remove);
 
 // Bulk delete operation
@@ -44,7 +46,7 @@ router.get("/all", isAuthenticated, all);
 router.get("/wip", isAuthenticated, workInProgressProducts);
 router.get("/unapproved", isAuthenticated, isSuper, unapproved);
 router.get("/raw-materials", isAuthenticated, rawMaterials);
-router.get("/:id", isAuthenticated, isAllowed, details);
+router.get("/:id", isAuthenticated, details);
 
 // Bulk operations
 router.post(
@@ -66,6 +68,7 @@ router.post(
 router.post("/update-inventory", isAuthenticated, isAllowed, updateInventory);
 router.put("/update-price", isAuthenticated, isAllowed, updatePrice);
 router.put("/update-stock", isAuthenticated, isAllowed, updateStock);
+router.put("/update-stock-and-shortages", isAuthenticated, isAllowed, updateStockAndShortages);
 router.put(
   "/clear-updated-price",
   isAuthenticated,
@@ -83,6 +86,12 @@ router.put(
   isAuthenticated,
   isAllowed,
   removeFromInventoryShortages
+);
+router.put(
+  "/update-shortage-quantity",
+  isAuthenticated,
+  isAllowed,
+  updateShortageQuantity
 );
 
 // Utility route to round all existing prices to whole numbers
