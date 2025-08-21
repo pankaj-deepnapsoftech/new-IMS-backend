@@ -44,7 +44,7 @@ router.get("/weekly", isAuthenticated, bomsGroupedByWeekDay);
 router.get("/inventory-shortages", isAuthenticated, getInventoryShortages);
 router.get("/inventory-approval-status/:salesOrderId", isAuthenticated, getInventoryApprovalStatus);
 router.get("/sales-order-status/:salesOrderId", isAuthenticated, getSalesOrderStatus);
-router.get("/sales-order-status/all", isAuthenticated, getAllSalesOrdersStatus);
+// router.get("/sales-order-status/all", isAuthenticated, getAllSalesOrdersStatus);
 router.get("/all-boms", isAuthenticated, getAllBOMs);
 router.get("/bom/:_id", isAuthenticated, findFinishedGoodBom);
 
