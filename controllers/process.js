@@ -80,12 +80,74 @@ exports.create = TryCatch(async (req, res) => {
 });
 exports.update = async (req, res) => {
   const { _id, status, bom } = req.body;
+const bomDoc = await BOM.findById(bom._id)
+  .populate({
+    path: "raw_materials",
+    populate: { path: "item", model: "Product" }
+  })
+  .populate({
+    path: "scrap_materials",
+    populate: { path: "item", model: "Product" }
+  });
 
-  const productionProcess = await ProductionProcess.findById(_id);
+
+
+if (!bomDoc) {
+  throw new ErrorHandler("BOM not found", 404);
+}
+
+
+await Promise.all(
+  bom.raw_materials.map(async (rm) => {
+    // Find the BOMRawMaterial document by its _id
+    const bomRawMat = await BOMRawMaterial.findById(rm._id);
+    if (bomRawMat) {
+      // Save in BOMRawMaterial
+      bomRawMat.uom_used_quantity = rm.uom_used_quantity || bomRawMat.uom_used_quantity;
+      await bomRawMat.save();
+
+      // Save in Product (item)
+      if (bomRawMat.item && rm.uom_used_quantity) {
+        const product = await Product.findById(bomRawMat.item);
+        if (product) {
+          product.uom_used_quantity = rm.uom_used_quantity;
+          await product.save();
+        }
+      }
+    }
+  })
+);
+
+await Promise.all(
+  bom.scrap_materials.map(async (sc) => {
+    // Find the BOMScrapMaterial document by its _id
+    const bomSc = await BOMScrapMaterial.findById(sc._id);
+    if (bomSc) {
+      // Save in BOMScrapMaterial
+      bomSc.uom_used_quantity = sc.uom_produced_quantity || bomSc.uom_used_quantity;
+      await bomSc.save();
+
+      // Save in Product (item)
+      if (bomSc.item && sc.uom_produced_quantity) {
+        const product = await Product.findById(bomSc.item);
+        if (product) {
+          product.uom_used_quantity = sc.uom_produced_quantity;
+          await product.save();
+        }
+      }
+    }
+  })
+);
+
+  const productionProcess = await ProductionProcess.findById(_id).populate({
+    path: "scrap_materials",
+    populate: { path: "item", model: "Product" }
+  });
   if (!productionProcess) {
     throw new ErrorHandler("Production Process doesn't exist", 400);
   }
-  if (status === "production start") { //new
+  if (status === "production started") {
+    //new
 
     // FINISHED GOOD
     const prevFG = productionProcess.finished_good;
@@ -116,13 +178,14 @@ exports.update = async (req, res) => {
     // RAW MATERIALS
     const prevRMs = productionProcess.raw_materials;
     const currRMs = bom.raw_materials;
+    console.log("here is it prevRms:: ", prevRMs);
+    console.log("here is it CURRrMs:: ", currRMs);
 
     await Promise.all(
       prevRMs.map(async (prevRm) => {
         const rawProduct = await Product.findById(prevRm.item);
         const currRm = currRMs.find(
-          (item) =>
-            (item?.item + "") === (prevRm?.item + "")
+          (item) => item?.item + "" === prevRm?.item + ""
         );
 
         if (!currRm || !rawProduct) return;
@@ -145,8 +208,11 @@ exports.update = async (req, res) => {
         }
 
         const bomRm = await BOMRawMaterial.findById(currRm._id);
+
         if (bomRm) {
           bomRm.in_production = true;
+          bomRm.uom_used_quantity =
+            currRm.uom_used_quantity || bomRm.uom_used_quantity;
           await bomRm.save();
         }
 
@@ -157,17 +223,17 @@ exports.update = async (req, res) => {
     // SCRAP MATERIALS
     const prevSCs = productionProcess.scrap_materials;
     const currSCs = bom.scrap_materials;
+    
 
     await Promise.all(
       prevSCs.map(async (prevSc) => {
         const scrapProduct = await Product.findById(prevSc.item);
         const currSc = currSCs.find(
-          (item) =>
-            (item?.item + "") === (prevSc?.item + "")
+          (item) => item?.item + "" === prevSc?.item + ""
         );
 
         if (!currSc || !scrapProduct) return;
-
+        
         const prevQty = prevSc.produced_quantity || 0;
         const newQty = currSc.produced_quantity || 0;
 
@@ -213,8 +279,12 @@ exports.update = async (req, res) => {
         step.work_left = incoming.work_left ?? step.work_left;
 
         // Check if any process values changed
-        if (prevStart !== step.start || prevDone !== step.done ||
-          prevWorkDone !== step.work_done || prevWorkLeft !== step.work_left) {
+        if (
+          prevStart !== step.start ||
+          prevDone !== step.done ||
+          prevWorkDone !== step.work_done ||
+          prevWorkLeft !== step.work_left
+        ) {
           hasChanges = true;
         }
       }
@@ -223,37 +293,44 @@ exports.update = async (req, res) => {
   }
 
   // Check if finished good quantities changed
-  console.log("Checking finished_good changes...");
-  console.log("bom.finished_good:", bom?.finished_good);
-  console.log("Object.keys length:", bom?.finished_good ? Object.keys(bom.finished_good).length : 0);
+ 
+  console.log(
+    "Object.keys length:",
+    bom?.finished_good ? Object.keys(bom.finished_good).length : 0
+  );
 
   if (bom?.finished_good && Object.keys(bom.finished_good).length > 0) {
     const prevFG = productionProcess.finished_good;
     const currFG = bom.finished_good;
 
-    console.log("prevFG.produced_quantity:", prevFG.produced_quantity);
-    console.log("currFG.produced_quantity:", currFG.produced_quantity);
+    
 
     // Only check if produced_quantity exists and has changed
-    if (currFG.produced_quantity !== undefined &&
-      prevFG.produced_quantity !== currFG.produced_quantity) {
+    if (
+      currFG.produced_quantity !== undefined &&
+      prevFG.produced_quantity !== currFG.produced_quantity
+    ) {
       hasChanges = true;
       console.log("Finished good change detected!");
 
-      // ✅ Update actual value
+      // ✅ Update produced_quantity
       productionProcess.finished_good.produced_quantity = Number(currFG.produced_quantity) || 0;
+
+      // ✅ Also update remaining_quantity
+      productionProcess.finished_good.remaining_quantity =
+        (Number(prevFG.estimated_quantity) || 0) - (Number(currFG.produced_quantity) || 0);
     }
+
   }
 
   // Check if raw material quantities changed
-  console.log("Checking raw_materials changes...");
-  console.log("bom.raw_materials:", bom?.raw_materials);
+
 
   if (Array.isArray(bom?.raw_materials)) {
     bom.raw_materials.forEach((currRm, index) => {
       console.log(`Raw material ${index}:`, currRm);
       const prevRm = productionProcess.raw_materials.find(
-        (item) => (item?.item + "") === (currRm?.item + "")
+        (item) => item?.item + "" === currRm?.item + ""
       );
 
       console.log(`prevRm for ${index}:`, prevRm);
@@ -272,17 +349,30 @@ exports.update = async (req, res) => {
 
           // ✅ Update actual value
           prevRm.used_quantity = currUsedQty;
+
+          // ✅ Also update remaining_quantity
+          prevRm.remaining_quantity =
+            (Number(prevRm.estimated_quantity) || 0) - currUsedQty;
         }
+
       }
     });
   }
-
+  
   // Check if scrap material quantities changed
   if (Array.isArray(bom?.scrap_materials)) {
     bom.scrap_materials.forEach((currSc) => {
-      const prevSc = productionProcess.scrap_materials.find(
-        (item) => (item?.item + "") === (currSc?.item + "")
+      
+      
+      // const prevSc = productionProcess.scrap_materials.find(
+      //   (item) => item?.item + "" === currSc?.item + ""
+      // );
+       const prevSc = productionProcess.scrap_materials.find(
+        (item) => {if(item?.item?.name  === currSc?.item_name.label)
+          return item;
+         }
       );
+      console.log("This is prevSc::",prevSc)
 
       // Convert produced_quantity to number and check if it changed
       if (prevSc && currSc.produced_quantity !== undefined) {
@@ -300,14 +390,15 @@ exports.update = async (req, res) => {
   }
 
   // If any changes detected and status is not "production started", set to "work in progress"
-  console.log("hasChanges:", hasChanges);
-  console.log("current status:", productionProcess.status);
-  console.log("status from request:", status);
-  
+ 
+ 
   if (hasChanges && productionProcess.status === "production started") {
     productionProcess.status = "production in progress";
-    console.log("Status changed to production in progress");
-  } else if (productionProcess.status !== "production started" && typeof status === "string" && status.trim() !== "") {
+  } else if (
+    productionProcess.status !== "production started" &&
+    typeof status === "string" &&
+    status.trim() !== ""
+  ) {
     productionProcess.status = status;
     console.log("Status changed to:", status);
   } else {
@@ -318,8 +409,10 @@ exports.update = async (req, res) => {
   productionProcess.markModified("finished_good");
   productionProcess.markModified("raw_materials");
   productionProcess.markModified("scrap_materials");
-  console.log("production process status", productionProcess)
+  console.log("production process status", productionProcess);
   await productionProcess.save();
+
+  
 
   return res.status(200).json({
     success: true,
@@ -334,8 +427,9 @@ exports.moveToInventory = TryCatch(async (req, res) => {
   if (!processId) throw new ErrorHandler("Process ID not provided", 400);
 
   // Get production process details
-  const process = await ProductionProcess.findById(processId)
-    .populate("finished_good.item");
+  const process = await ProductionProcess.findById(processId).populate(
+    "finished_good.item"
+  );
 
   if (!process) throw new ErrorHandler("Production process not found", 404);
 
@@ -357,11 +451,9 @@ exports.moveToInventory = TryCatch(async (req, res) => {
   res.status(200).json({
     success: true,
     message: `Moved ${qty} units to inventory successfully.`,
-    updatedProcess: process
+    updatedProcess: process,
   });
 });
-
-
 
 // Out Finish Goods API
 exports.outFinishGoods = async (req, res) => {
@@ -386,24 +478,26 @@ exports.outFinishGoods = async (req, res) => {
     process.status = "out finish goods"; // ya jo enum me suitable ho
     await process.save();
 
-    return res.status(200).json({ message: "Out Finish Goods marked successfully", process });
+    return res
+      .status(200)
+      .json({ message: "Out Finish Goods marked successfully", process });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server Error" });
   }
 };
 
-
 exports.getInventoryProcesses = TryCatch(async (req, res) => {
   // Array of statuses jo moved to inventory ke baad aate hain
   const statuses = ["moved to inventory", "allocated finish goods","out finish goods"];
 
-  const processes = await ProductionProcess.find({ status: { $in: statuses } })
-    .populate("finished_good.item"); // agar relation hai
+  const processes = await ProductionProcess.find({
+    status: { $in: statuses },
+  }).populate("finished_good.item"); // agar relation hai
 
   res.status(200).json({
     success: true,
-    data: processes
+    data: processes,
   });
 });
 
@@ -434,7 +528,9 @@ exports.receiveByInventory = async (req, res) => {
     const bomFinishedMaterial = process.finished_good;
 
     if (!bomFinishedMaterial) {
-      return res.status(404).json({ message: "Finished good material not found" });
+      return res
+        .status(404)
+        .json({ message: "Finished good material not found" });
     }
 
     // Step 4: Update finished product stock
@@ -455,7 +551,8 @@ exports.receiveByInventory = async (req, res) => {
 
     // Success
     res.status(200).json({
-      message: "Finished goods received by inventory and stock updated successfully",
+      message:
+        "Finished goods received by inventory and stock updated successfully",
       process,
     });
   } catch (error) {
@@ -463,8 +560,6 @@ exports.receiveByInventory = async (req, res) => {
     res.status(500).json({ message: error.message || "Server Error" });
   }
 };
-
-
 
 exports.remove = TryCatch(async (req, res) => {
   const { _id } = req.params;
@@ -485,6 +580,7 @@ exports.remove = TryCatch(async (req, res) => {
     message: "Production process has been deleted successfully",
   });
 });
+
 exports.details = TryCatch(async (req, res) => {
   const { _id } = req.params;
   let productionProcess = await ProductionProcess.findById(_id)
@@ -505,7 +601,6 @@ exports.details = TryCatch(async (req, res) => {
           },
         },
       },
-
     ])
     .populate({
       path: "bom",
@@ -540,11 +635,10 @@ exports.details = TryCatch(async (req, res) => {
       ],
     });
 
-
   if (!_id) {
     throw new ErrorHandler("Production Process doesn't exist", 400);
   }
-
+  // console.log("in backend",productionProcess)
   res.status(200).json({
     status: 200,
     success: true,
@@ -586,26 +680,52 @@ exports.requestForAllocation = TryCatch(async (req, res) => {
   });
 });
 exports.markInventoryInTransit = TryCatch(async (req, res) => {
-  const { _id } = req.body; // Process ID
-  // console.log("Marking inventory in transit for process ID:", _id);
+   const { _id } = req.body; // Raw Material ID
+   console.log(_id)
   if (!_id) {
-    throw new ErrorHandler("Process ID is required", 400);
+    throw new ErrorHandler("Raw material ID is required", 400);
   }
 
-  const process = await ProductionProcess.findById(_id);
-  if (!process) {
-    throw new ErrorHandler("Production process not found", 404);
+  // 1️⃣ Update raw material
+  const updatedRawMaterial = await BOMRawMaterial.findByIdAndUpdate(
+    _id,
+    { isOutForInventoryClicked: true }, // ✅ new field
+    { new: true }
+  );
+
+  if (!updatedRawMaterial) {
+    throw new ErrorHandler("Raw material not found", 404);
   }
 
-  process.status = "inventory in transit";
-  await process.save();
+  // 2️⃣ Get related BOM with all raw materials
+  const requiredBom = await BOM.findById(updatedRawMaterial.bom)
+    .populate("raw_materials");
+
+  if (!requiredBom) {
+    throw new ErrorHandler("BOM not found", 404);
+  }
+
+  // 3️⃣ Check if all raw materials are out for inventory
+  const allOutForInventory = requiredBom.raw_materials.every(
+    rm => rm.isOutForInventoryClicked
+  );
+
+  // 4️⃣ If all are out, update production process
+  if (allOutForInventory && requiredBom.production_process) {
+    await ProductionProcess.findByIdAndUpdate(
+      requiredBom.production_process,
+      { status: "inventory in transit" }
+    );
+  }
 
   res.status(200).json({
     success: true,
-    message: "Status updated to 'inventory in transit'",
-    updated: process,
+    message: "Raw material marked out for inventory successfully",
+    rawMaterial: updatedRawMaterial,
+    allOutForInventory
   });
 });
+
 exports.startProduction = async (req, res) => {
   try {
     const { _id } = req.body; // production process ID
@@ -682,7 +802,6 @@ exports.startProduction = async (req, res) => {
       message: "Production started successfully",
       process,
     });
-
   } catch (error) {
     console.error("Error in startProduction:", error);
     res.status(500).json({
@@ -693,7 +812,6 @@ exports.startProduction = async (req, res) => {
   }
 };
 // yeeeee
-
 
 exports.markDone = TryCatch(async (req, res) => {
   const { _id } = req.params;
@@ -756,7 +874,6 @@ exports.pauseProduction = TryCatch(async (req, res) => {
   });
 });
 
-
 // controllers/process.js
 exports.updateInventoryStatus = TryCatch(async (req, res) => {
   const { processId, status } = req.body;
@@ -766,7 +883,10 @@ exports.updateInventoryStatus = TryCatch(async (req, res) => {
 
   const allowed = ["allocated finish goods", "received"];
   if (!allowed.includes(status)) {
-    throw new ErrorHandler(`Invalid status. Allowed: ${allowed.join(", ")}`, 400);
+    throw new ErrorHandler(
+      `Invalid status. Allowed: ${allowed.join(", ")}`,
+      400
+    );
   }
 
   const process = await ProductionProcess.findById(processId);
@@ -783,7 +903,7 @@ exports.updateInventoryStatus = TryCatch(async (req, res) => {
   res.status(200).json({
     success: true,
     message: `Status updated to '${status}'`,
-    updatedProcess: process
+    updatedProcess: process,
   });
 });
 

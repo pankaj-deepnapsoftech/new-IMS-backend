@@ -21,6 +21,10 @@ const BOMScrapMaterialSchema = new Schema(
     total_part_cost: {
       type: Number,
     },
+    uom_used_quantity: {
+      type: String,
+      default: "",
+    },
     is_production_started: {
       type: Boolean,
       default: false

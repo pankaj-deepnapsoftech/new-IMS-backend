@@ -1939,6 +1939,7 @@ exports.allRawMaterialsForInventory = TryCatch(async (req, res) => {
       change_type: rm.change_type,
       quantity_changed: rm.quantity_changed,
       isInventoryApprovalClicked: rm.isInventoryApprovalClicked,
+      isOutForInventoryClicked:rm.isOutForInventoryClicked,
     });
   }
 
@@ -3158,7 +3159,6 @@ const getAllSalesOrdersStatus = async (req, res) => {
     // .sort({ createdAt: -1 });
 
 
-
     if (!allSalesOrders || allSalesOrders.length === 0) {
 
       return res.status(200).json({
@@ -3221,21 +3221,7 @@ const getAllSalesOrdersStatus = async (req, res) => {
 
       .populate('bom');
 
-
-
-    console.log(`Total BOMs found: ${allBOMs.length}`);
-
-    console.log(`Total Sales Orders found: ${allSalesOrders.length}`);
-
-    console.log(`Total Production Processes found: ${allProductionProcesses.length}`);
-
-    console.log(`Total Raw Materials found: ${allRawMaterials.length}`);
-
-
-
     const salesOrdersStatus = [];
-
-
 
     // Process each sales order
 

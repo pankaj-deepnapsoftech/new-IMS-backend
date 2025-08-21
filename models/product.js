@@ -27,6 +27,11 @@ const productSchema = new Schema(
       ],
       maxlength: [40, "Unit of Measurement (UoM) cannot exceed 40 characters"],
     },
+    uom_used_quantity: {
+      type: String,
+      default: "",
+    },
+
     category: {
       type: String,
       required: [true, "Product Category is a required field"],
