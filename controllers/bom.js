@@ -150,7 +150,7 @@ exports.create = TryCatch(async (req, res) => {
       groupedMaterials[itemName].totalQuantity += Number(material.quantity) || 0;
       groupedMaterials[itemName].materials.push(material);
     }
-  });
+  }); 
 
   // Check for stock shortages based on grouped materials
   const shortages = [];
@@ -162,7 +162,9 @@ exports.create = TryCatch(async (req, res) => {
       }
       
       // Calculate total available stock (current_stock + updated_stock)
-      const totalAvailableStock = (isProdExists.current_stock || 0) + (isProdExists.updated_stock || 0);
+      const totalAvailableStock = (isProdExists.current_stock || 0);
+      console.log("tanish 1:", groupedMaterial.totalQuantity);
+      console.log("tanish 2:", totalAvailableStock);
       const quantityDifference = groupedMaterial.totalQuantity - totalAvailableStock;
 
       if (quantityDifference > 0) {
@@ -489,7 +491,7 @@ exports.update = TryCatch(async (req, res) => {
         }
 
         // Calculate total available stock (current_stock + updated_stock)
-        const totalAvailableStock = (isProdExists.current_stock || 0) + (isProdExists.updated_stock || 0);
+        const totalAvailableStock = (isProdExists.current_stock || 0);
         const quantityDifference = groupedMaterial.totalQuantity - totalAvailableStock;
 
         if (quantityDifference > 0) {

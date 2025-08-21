@@ -1070,6 +1070,7 @@ exports.updatePrice = TryCatch(async (req, res) => {
   });
 });
 
+// TODO:
 exports.updateStock = TryCatch(async (req, res) => {
   const { productId, newStock } = req.body;
 
@@ -1099,6 +1100,7 @@ exports.updateStock = TryCatch(async (req, res) => {
     productId,
     {
       updated_stock: updatedStock, // Store updated stock in new field
+      current_stock: currentStock+updatedStock,
     },
     { new: true }
   );
@@ -1245,7 +1247,7 @@ exports.removeFromInventoryShortages = TryCatch(async (req, res) => {
   });
 });
 
-// Function to update shortage quantity for partially resolved items
+// TODO: Function to update shortage quantity for partially resolved items
 exports.updateShortageQuantity = TryCatch(async (req, res) => {
   const { productId, newShortageQuantity } = req.body;
 
