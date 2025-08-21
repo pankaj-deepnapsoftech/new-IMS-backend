@@ -422,7 +422,7 @@ await Promise.all(
 };
 
 exports.moveToInventory = TryCatch(async (req, res) => {
-  const { processId } = req.body; // from frontend
+  const { processId } = req.body;
 
   if (!processId) throw new ErrorHandler("Process ID not provided", 400);
 
@@ -433,27 +433,21 @@ exports.moveToInventory = TryCatch(async (req, res) => {
 
   if (!process) throw new ErrorHandler("Production process not found", 404);
 
-  // Update Inventory
-  const product = await Product.findById(process.finished_good.item._id);
+ 
+  const product = await Product.findById(process.finished_good.item?._id);
   if (!product) throw new ErrorHandler("Product not found in inventory", 404);
 
-  // Increase stock
-  const qty = process.finished_good.produced_quantity || 0;
-  product.current_stock += qty;
-  product.change_type = "increase";
-  product.quantity_changed = qty;
-  await product.save();
-
-  // Mark process as moved to inventory
+ 
   process.status = "moved to inventory";
   await process.save();
 
   res.status(200).json({
     success: true,
-    message: `Moved ${qty} units to inventory successfully.`,
+    message: `Process successfully marked as 'moved to inventory'.`,
     updatedProcess: process,
   });
 });
+
 
 // Out Finish Goods API
 exports.outFinishGoods = async (req, res) => {
@@ -524,13 +518,10 @@ exports.receiveByInventory = async (req, res) => {
       return res.status(400).json({ message: "No finished good linked to this process." });
     }
 
-    
     const bomFinishedMaterial = process.finished_good;
 
     if (!bomFinishedMaterial) {
-      return res
-        .status(404)
-        .json({ message: "Finished good material not found" });
+      return res.status(404).json({ message: "Finished good material not found" });
     }
 
     // Step 4: Update finished product stock
@@ -543,16 +534,27 @@ exports.receiveByInventory = async (req, res) => {
       return res.status(404).json({ message: "Finished product not found" });
     }
 
-    finishedProduct.current_stock =
-      (finishedProduct.current_stock || 0) + bomFinishedMaterial.quantity;
+    const quantityRaw = bomFinishedMaterial.produced_quantity;
+    const quantityToAdd = Number(quantityRaw);
+    // console.log(bomFinishedMaterial)
+
+    if (isNaN(quantityToAdd)) {
+      return res.status(400).json({ message: "Finished good quantity is invalid or missing." });
+    }
+
+    const currentStockRaw = finishedProduct.current_stock;
+    const currentStock = Number(currentStockRaw) || 0;
+
+ 
+    finishedProduct.current_stock = currentStock + quantityToAdd;
     finishedProduct.change_type = "increase";
-    finishedProduct.quantity_changed = bomFinishedMaterial.quantity;
+    finishedProduct.quantity_changed = quantityToAdd;
+
     await finishedProduct.save();
 
     // Success
     res.status(200).json({
-      message:
-        "Finished goods received by inventory and stock updated successfully",
+      message: "Finished goods received by inventory and stock updated successfully",
       process,
     });
   } catch (error) {
@@ -560,6 +562,8 @@ exports.receiveByInventory = async (req, res) => {
     res.status(500).json({ message: error.message || "Server Error" });
   }
 };
+
+
 
 exports.remove = TryCatch(async (req, res) => {
   const { _id } = req.params;
