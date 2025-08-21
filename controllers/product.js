@@ -1389,13 +1389,28 @@ exports.updateStockAndShortages = TryCatch(async (req, res) => {
         stockDifference: stockDifference
       });
 
-      // If new shortage quantity is 0, remove the shortage
+      // If new shortage quantity is 0, mark as resolved instead of deleting
       if (newShortageQuantity === 0) {
-        return InventoryShortage.findByIdAndDelete(shortage._id);
+        return InventoryShortage.findByIdAndUpdate(
+          shortage._id,
+          { 
+            shortage_quantity: 0,
+            is_resolved: true,
+            resolved_at: new Date(),
+            resolved_by: req.user._id,
+            should_recreate_on_edit: true // Allow recreation on BOM edit
+          },
+          { new: true }
+        );
       } else {
         return InventoryShortage.findByIdAndUpdate(
           shortage._id,
-          { shortage_quantity: newShortageQuantity },
+          { 
+            shortage_quantity: newShortageQuantity,
+            is_resolved: false,
+            resolved_at: null,
+            resolved_by: null
+          },
           { new: true }
         );
       }
@@ -1431,9 +1446,12 @@ exports.updateStockAndShortages = TryCatch(async (req, res) => {
         if (bom) {
           return InventoryShortage.create({
             bom: bomId,
-            raw_material: bomRawMaterials.find(material => material.bom.toString() === bomId.toString())?._id,
+            raw_material: bomRawMaterials.find(material => material.bom && material.bom.toString() === bomId.toString())?._id,
             item: productId,
-            shortage_quantity: shortageQuantity
+            shortage_quantity: shortageQuantity,
+            original_shortage_quantity: shortageQuantity,
+            is_resolved: false,
+            should_recreate_on_edit: true
           });
         }
         return null;

@@ -1,0 +1,6 @@
+inventory_category,name,uom,category,current_stock,min_stock,max_stock,price,hsn_code,item_type,product_or_service,sub_category,regular_buying_price,wholesale_buying_price,mrp,dealer_price,distributor_price
+direct,Sample Steel Rod,kg,raw materials,100,10,500,1000,HSN001,buy,product,Metal Parts,900,850,1200,1100,1050
+direct,Consultation Service,hours,service,0,,,,HSN002,sell,service,Consultation,,,600,550,525
+direct,Trading Electronics,pcs,trading goods,250,25,1000,750,HSN003,both,product,Electronics,700,650,900,850,800
+direct,Finished Product A,units,finished goods,50,5,200,2500,HSN004,sell,product,Final Products,,,3000,2800,2600
+direct,Chemical Consumable,liters,consumables,75,15,300,450,HSN005,buy,product,Chemicals,400,380,500,475,450 

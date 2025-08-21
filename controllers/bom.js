@@ -130,40 +130,51 @@ exports.create = TryCatch(async (req, res) => {
 
 
 
-  // Check for stock shortages
-
-  const shortages = [];
-
-  await Promise.all(
-
-    raw_materials.map(async (material) => {
-
-      const isProdExists = await Product.findById(material.item);
-
-      if (!isProdExists) {
-
-        throw new ErrorHandler(`Raw material doesn't exist`, 400);
-
+  // Get all products to group by name
+  const products = await Product.find({ _id: { $in: raw_materials.map(m => m.item) } });
+  
+  // Group raw materials by item name and sum their quantities
+  const groupedMaterials = {};
+  raw_materials.forEach(material => {
+    const product = products.find(p => p._id.toString() === material.item);
+    if (product) {
+      const itemName = product.name;
+      if (!groupedMaterials[itemName]) {
+        groupedMaterials[itemName] = {
+          item: material.item,
+          totalQuantity: 0,
+          materials: [],
+          product: product
+        };
       }
+      groupedMaterials[itemName].totalQuantity += Number(material.quantity) || 0;
+      groupedMaterials[itemName].materials.push(material);
+    }
+  });
 
-      const quantityDifference = material.quantity - (isProdExists.current_stock || 0);
+  // Check for stock shortages based on grouped materials
+  const shortages = [];
+  await Promise.all(
+    Object.values(groupedMaterials).map(async (groupedMaterial) => {
+      const isProdExists = await Product.findById(groupedMaterial.item);
+      if (!isProdExists) {
+        throw new ErrorHandler(`Raw material doesn't exist`, 400);
+      }
+      
+      // Calculate total available stock (current_stock + updated_stock)
+      const totalAvailableStock = (isProdExists.current_stock || 0) + (isProdExists.updated_stock || 0);
+      const quantityDifference = groupedMaterial.totalQuantity - totalAvailableStock;
 
       if (quantityDifference > 0) {
-
-        insuffientStockMsg += ` Insufficient stock of ${isProdExists.name}`;
-
+        insuffientStockMsg += ` Insufficient stock of ${isProdExists.name} (Required: ${groupedMaterial.totalQuantity}, Available: ${totalAvailableStock})`;
         shortages.push({
-
-          item: material.item,
-
+          item: groupedMaterial.item,
           shortage_quantity: quantityDifference,
-
+          total_required: groupedMaterial.totalQuantity,
+          available_stock: totalAvailableStock
         });
-
       }
-
     })
-
   );
 
 
@@ -262,39 +273,38 @@ exports.create = TryCatch(async (req, res) => {
 
         });
 
-
-
-        const shortage = shortages.find(s => s.item.toString() === material.item.toString());
-
-        if (shortage) {
-
-          await InventoryShortage.create({
-
-            bom: bom._id,
-
-            raw_material: createdMaterial._id,
-
-            item: material.item,
-
-            shortage_quantity: shortage.shortage_quantity,
-
-          });
-
-        }
-
-
-
         return createdMaterial._id;
 
       })
 
     );
 
-
-
     bom.raw_materials = bom_raw_materials;
 
     await bom.save();
+
+    // Create inventory shortages based on grouped materials
+    for (const shortage of shortages) {
+      // Find the first raw material record for this item to link the shortage
+      const firstRawMaterial = await BOMRawMaterial.findOne({ 
+        bom: bom._id, 
+        item: shortage.item 
+      });
+
+      if (firstRawMaterial) {
+        await InventoryShortage.create({
+          bom: bom._id,
+          raw_material: firstRawMaterial._id,
+          item: shortage.item,
+          shortage_quantity: shortage.shortage_quantity,
+          original_shortage_quantity: shortage.shortage_quantity,
+          total_required: shortage.total_required,
+          available_stock: shortage.available_stock,
+          is_resolved: false,
+          should_recreate_on_edit: true,
+        });
+      }
+    }
 
   }
 
@@ -449,47 +459,50 @@ exports.update = TryCatch(async (req, res) => {
 
 
   if (raw_materials) {
+    // Get all products to group by name
+    const products = await Product.find({ _id: { $in: raw_materials.map(m => m.item) } });
+    
+    // Group raw materials by item name and sum their quantities
+    const groupedMaterials = {};
+    raw_materials.forEach(material => {
+      const product = products.find(p => p._id.toString() === material.item);
+      if (product) {
+        const itemName = product.name;
+        if (!groupedMaterials[itemName]) {
+          groupedMaterials[itemName] = {
+            item: material.item,
+            totalQuantity: 0,
+            materials: [],
+            product: product
+          };
+        }
+        groupedMaterials[itemName].totalQuantity += Number(material.quantity) || 0;
+        groupedMaterials[itemName].materials.push(material);
+      }
+    });
 
     await Promise.all(
-
-      raw_materials.map(async (material) => {
-
-        const isRawMaterialExists = await BOMRawMaterial.findById(material._id);
-
-        if (isRawMaterialExists) {
-
-          const isProdExists = await Product.findById(material.item);
-
-          if (!isProdExists) {
-
-            throw new ErrorHandler(`Product doesn't exist`, 400);
-
-          }
-
-          const quantityDifference = material.quantity - (isProdExists.current_stock || 0);
-
-          if (quantityDifference > 0) {
-
-            insuffientStockMsg += ` Insufficient stock of ${isProdExists.name}`;
-
-            shortages.push({
-
-              item: material.item,
-
-              raw_material_id: material._id,
-
-              shortage_quantity: quantityDifference,
-
-            });
-
-          }
-
+      Object.values(groupedMaterials).map(async (groupedMaterial) => {
+        const isProdExists = await Product.findById(groupedMaterial.item);
+        if (!isProdExists) {
+          throw new ErrorHandler(`Product doesn't exist`, 400);
         }
 
+        // Calculate total available stock (current_stock + updated_stock)
+        const totalAvailableStock = (isProdExists.current_stock || 0) + (isProdExists.updated_stock || 0);
+        const quantityDifference = groupedMaterial.totalQuantity - totalAvailableStock;
+
+        if (quantityDifference > 0) {
+          insuffientStockMsg += ` Insufficient stock of ${isProdExists.name} (Required: ${groupedMaterial.totalQuantity}, Available: ${totalAvailableStock})`;
+          shortages.push({
+            item: groupedMaterial.item,
+            shortage_quantity: quantityDifference,
+            total_required: groupedMaterial.totalQuantity,
+            available_stock: totalAvailableStock
+          });
+        }
       })
-
     );
-
   }
 
 
@@ -566,59 +579,91 @@ exports.update = TryCatch(async (req, res) => {
 
 
 
-  if (raw_materials) {
+  if (raw_materials && raw_materials.length > 0) {
+    // Get existing shortages for this BOM before deleting them
+    const existingShortages = await InventoryShortage.find({ bom: bom._id });
+    
+    // Create a map of existing shortages by item for quick lookup
+    const existingShortagesMap = new Map();
+    existingShortages.forEach(shortage => {
+      if (shortage.item) {
+        existingShortagesMap.set(shortage.item.toString(), shortage);
+      }
+    });
 
+    // Delete all existing shortages for this BOM
+    await InventoryShortage.deleteMany({ bom: bom._id });
+
+    // Process raw materials and create/update them
+    const processedRawMaterials = [];
+    
     await Promise.all(
-
       raw_materials.map(async (material) => {
-
-        const isExistingRawMaterial = await BOMRawMaterial.findById(material._id);
-
-        if (isExistingRawMaterial) {
-
-          isExistingRawMaterial.item = material.item;
-
-          isExistingRawMaterial.description = material?.description;
-
-          isExistingRawMaterial.quantity = material.quantity;
-
-          isExistingRawMaterial.assembly_phase = material?.assembly_phase;
-
-          isExistingRawMaterial.supporting_doc = material?.supporting_doc;
-
-          isExistingRawMaterial.comments = material?.comments;
-
-          isExistingRawMaterial.total_part_cost = material?.total_part_cost;
-
-          await isExistingRawMaterial.save();
-
-
-
-          const shortage = shortages.find(s => s.item.toString() === material.item.toString());
-
-          if (shortage) {
-
-            await InventoryShortage.findOneAndUpdate(
-
-              { bom: bom._id, raw_material: material._id },
-
-              { shortage_quantity: shortage.shortage_quantity },
-
-              { upsert: true, new: true }
-
-            );
-
-          } else {
-
-            await InventoryShortage.deleteOne({ bom: bom._id, raw_material: material._id });
-
+        let rawMaterialRecord;
+        
+        if (material._id) {
+          // Update existing raw material
+          const isExistingRawMaterial = await BOMRawMaterial.findById(material._id);
+          if (isExistingRawMaterial) {
+            isExistingRawMaterial.item = material.item;
+            isExistingRawMaterial.description = material?.description;
+            isExistingRawMaterial.quantity = material.quantity;
+            isExistingRawMaterial.assembly_phase = material?.assembly_phase;
+            isExistingRawMaterial.supporting_doc = material?.supporting_doc;
+            isExistingRawMaterial.comments = material?.comments;
+            isExistingRawMaterial.total_part_cost = material?.total_part_cost;
+            await isExistingRawMaterial.save();
+            rawMaterialRecord = isExistingRawMaterial;
           }
+        } else {
+          // Create new raw material
+          rawMaterialRecord = await BOMRawMaterial.create({
+            ...material,
+            bom: bom._id,
+          });
+        }
+        
+        if (rawMaterialRecord) {
+          processedRawMaterials.push(rawMaterialRecord);
+        }
+      })
+    );
 
+    // Create inventory shortages based on grouped materials
+    for (const shortage of shortages) {
+      // Find the first raw material record for this item to link the shortage
+      const firstRawMaterial = processedRawMaterials.find(
+        rm => rm.item && rm.item.toString() === shortage.item.toString()
+      );
+      
+      if (firstRawMaterial) {
+        // Check if there was a previously resolved shortage for this item
+        const existingShortage = existingShortagesMap.get(shortage.item.toString());
+        
+        let originalShortageQuantity = shortage.shortage_quantity;
+        let shouldRecreateOnEdit = true;
+        
+        // If there was a previously resolved shortage, use its original quantity
+        if (existingShortage && existingShortage.is_resolved) {
+          originalShortageQuantity = existingShortage.original_shortage_quantity;
+          shouldRecreateOnEdit = existingShortage.should_recreate_on_edit;
         }
 
-      })
-
-    );
+        await InventoryShortage.create({
+          bom: bom._id,
+          raw_material: firstRawMaterial._id,
+          item: shortage.item,
+          shortage_quantity: shortage.shortage_quantity,
+          original_shortage_quantity: originalShortageQuantity,
+          total_required: shortage.total_required,
+          available_stock: shortage.available_stock,
+          is_resolved: false, // Reset to unresolved when BOM is edited
+          resolved_at: null,
+          resolved_by: null,
+          should_recreate_on_edit: shouldRecreateOnEdit,
+        });
+      }
+    }
 
   }
 
@@ -1797,25 +1842,18 @@ exports.getInventoryShortages = TryCatch(async (req, res) => {
 
 
   const formattedShortages = shortages.map(shortage => ({
-
     bom_name: shortage.bom?.bom_name || 'Unknown BOM',
-
     item_name: shortage.item?.name || 'Unknown Item',
-
     item: shortage.item?._id || null,
-
     shortage_quantity: shortage.shortage_quantity,
-
+    total_required: shortage.total_required || shortage.shortage_quantity,
+    available_stock: shortage.available_stock || shortage.item?.current_stock || 0,
     current_stock: shortage.item?.current_stock || 0,
-
     updated_stock: shortage.item?.updated_stock || null,
-
     current_price: shortage.item?.price || 0,
-
     updated_price: shortage.item?.updated_price || null,
-
     updated_at: shortage.updatedAt,
-
+    is_grouped: shortage.total_required && shortage.total_required !== shortage.shortage_quantity,
   }));
 
 
@@ -3732,5 +3770,107 @@ exports.bulkRemove = TryCatch(async (req, res) => {
     status: 200,
     success: true,
     message: `${deletedBOMs.deletedCount} BOM(s) deleted successfully`,
+  });
+});
+
+// Function to recreate shortages for a BOM when it's edited
+exports.recreateShortagesForBOM = TryCatch(async (req, res) => {
+  const { bomId } = req.params;
+
+  if (!bomId) {
+    throw new ErrorHandler("BOM ID is required", 400);
+  }
+
+  // Find the BOM with all its raw materials
+  const bom = await BOM.findById(bomId)
+    .populate({ path: "raw_materials", populate: { path: "item" } });
+
+  if (!bom) {
+    throw new ErrorHandler("BOM not found", 400);
+  }
+
+  // Get existing shortages for this BOM
+  const existingShortages = await InventoryShortage.find({ bom: bomId });
+  
+  // Create a map of existing shortages by item for quick lookup
+  const existingShortagesMap = new Map();
+  existingShortages.forEach(shortage => {
+    if (shortage.item) {
+      existingShortagesMap.set(shortage.item.toString(), shortage);
+    }
+  });
+
+  // Delete all existing shortages for this BOM
+  await InventoryShortage.deleteMany({ bom: bomId });
+
+  const recreatedShortages = [];
+
+  // Process each raw material to check for shortages
+  for (const rawMaterial of bom.raw_materials) {
+    const product = await Product.findById(rawMaterial.item);
+    if (!product) continue;
+
+    // Calculate total available stock
+    const totalAvailableStock = (product.current_stock || 0) + (product.updated_stock || 0);
+    const quantityDifference = rawMaterial.quantity - totalAvailableStock;
+
+    if (quantityDifference > 0) {
+      // Check if there was a previously resolved shortage for this item
+      const existingShortage = existingShortagesMap.get(rawMaterial.item.toString());
+      
+      let originalShortageQuantity = quantityDifference;
+      let shouldRecreateOnEdit = true;
+      
+      // If there was a previously resolved shortage, use its original quantity
+      if (existingShortage && existingShortage.is_resolved) {
+        originalShortageQuantity = existingShortage.original_shortage_quantity;
+        shouldRecreateOnEdit = existingShortage.should_recreate_on_edit;
+      }
+
+      const newShortage = await InventoryShortage.create({
+        bom: bomId,
+        raw_material: rawMaterial._id,
+        item: rawMaterial.item,
+        shortage_quantity: quantityDifference,
+        original_shortage_quantity: originalShortageQuantity,
+        is_resolved: false, // Reset to unresolved when BOM is edited
+        resolved_at: null,
+        resolved_by: null,
+        should_recreate_on_edit: shouldRecreateOnEdit,
+      });
+
+      recreatedShortages.push(newShortage);
+    }
+  }
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Shortages recreated successfully for BOM",
+    bomId: bomId,
+    recreatedShortages: recreatedShortages.length,
+    shortages: recreatedShortages
+  });
+});
+
+// Function to get all shortages for a specific BOM
+exports.getBOMShortages = TryCatch(async (req, res) => {
+  const { bomId } = req.params;
+
+  if (!bomId) {
+    throw new ErrorHandler("BOM ID is required", 400);
+  }
+
+  const shortages = await InventoryShortage.find({ bom: bomId })
+    .populate('item', 'name product_id current_stock updated_stock')
+    .populate('raw_material', 'quantity description')
+    .populate('resolved_by', 'name email');
+
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "BOM shortages fetched successfully",
+    bomId: bomId,
+    shortages: shortages
   });
 });
