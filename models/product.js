@@ -101,6 +101,14 @@ const productSchema = new Schema(
     distributor_price: {
       type: Number,
     },
+    price_history: [{  // New field for price history
+    price: Number,
+    updated_at: { type: Date, default: Date.now }
+  }],
+  price_history: [{  // New field for price history
+    price: Number,
+    updated_at: { type: Date, default: Date.now }
+  }],
     store: {
       type: Schema.Types.ObjectId,
       ref: "Store",
