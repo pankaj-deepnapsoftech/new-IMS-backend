@@ -46,7 +46,7 @@ const bomSchema = new Schema(
     manpower: [
       {
         number: {
-          type: String, // store as string, e.g., "5"
+          type: String,
           required: true
         }
       }

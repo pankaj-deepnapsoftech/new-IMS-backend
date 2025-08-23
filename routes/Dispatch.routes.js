@@ -19,6 +19,6 @@ routes.route("/getAll").get(isAuthenticated, GetAllDispatches);
 routes.route("/Delete-Dispatch/:id").post(isAuthenticated, DeleteDispatch);
 routes.route("/get-Dispatch").get(isAuthenticated, GetDispatch);
 
-routes.route("/update-Dispatch/:id").put(isAuthenticated, UpdateDispatch);
+routes.route("/update/:id").put(isAuthenticated, UpdateDispatch);
 
 module.exports = routes;

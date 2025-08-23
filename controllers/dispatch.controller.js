@@ -7,7 +7,6 @@ const Product = require("../models/product");
 exports.CreateDispatch = TryCatch(async (req, res) => {
   const data = req.body;
 
-  // Check if dispatch already exists
   const find = await DispatchModel.findOne({
     sales_order_id: data.sales_order_id,
   });
@@ -53,7 +52,6 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
     updated_stock: product.current_stock,
   });
 });
-
 
 exports.GetAllDispatches = TryCatch(async (req, res) => {
   const { page, limit } = req.query;
@@ -179,15 +177,64 @@ exports.UpdateDispatch = TryCatch(async (req, res) => {
   const { id } = req.params;
   const data = req.body;
 
-  const find = await DispatchModel.findById(id);
-  if (!find) {
-    throw new ErrorHandler("Data not Found", 400);
+  const existingDispatch = await DispatchModel.findById(id);
+  if (!existingDispatch) {
+    throw new ErrorHandler("Dispatch not found", 404);
   }
-  await DispatchModel.findByIdAndUpdate(id, data);
+
+  if (data.dispatch_qty !== undefined && data.product_id) {
+    const newDispatchQty = parseInt(data.dispatch_qty);
+
+    const product = await Product.findById(data.product_id);
+    if (!product) {
+      throw new ErrorHandler("Product not found", 404);
+    }
+
+    if (product.current_stock < newDispatchQty) {
+      throw new ErrorHandler(
+        `Insufficient stock. Available: ${product.current_stock}, Required: ${newDispatchQty}`,
+        400
+      );
+    }
+
+    // 🚨 Always subtract the NEW dispatch qty (cumulative behavior)
+    product.current_stock = product.current_stock - newDispatchQty;
+    product.change_type = "decrease";
+    product.quantity_changed = newDispatchQty;
+
+    await product.save();
+  }
+
+  // Update the dispatch record
+  const updatedDispatch = await DispatchModel.findByIdAndUpdate(id, data, {
+    new: true,
+  });
+
   return res.status(200).json({
-    message: "Data Updated Successful",
+    message: "Dispatch updated successfully, inventory decreased",
+    data: updatedDispatch,
+    updated_stock:
+      data.dispatch_qty !== undefined && data.product_id
+        ? (await Product.findById(data.product_id)).current_stock
+        : null,
   });
 });
+
+
+// exports.UpdateDispatch = TryCatch(async (req, res) => {
+//   const { id } = req.params;
+//   const data = req.body;
+
+//   const find = await DispatchModel.findById(id);
+//   if (!find) {
+//     throw new ErrorHandler("Data not Found", 400);
+//   }
+//   await DispatchModel.findByIdAndUpdate(id, data);
+//   return res.status(200).json({
+//     message: "Data Updated Successful",
+//   });
+// });
+
 exports.SendFromProduction = async (req, res) => {
   try {
     const { production_process_id } = req.body;
