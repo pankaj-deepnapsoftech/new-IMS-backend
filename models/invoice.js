@@ -87,7 +87,7 @@ const invoiceSchema = new Schema(
     },
     buyer: {
       type: Schema.Types.ObjectId,
-      ref: "Agent",
+      ref: "Parties",
     },
     supplier: {
       type: Schema.Types.ObjectId,

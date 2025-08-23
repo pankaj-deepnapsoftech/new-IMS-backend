@@ -208,6 +208,9 @@ exports.getAll = TryCatch(async (req, res) => {
               cust_id: 1,
               company_name: 1,
               bill_to: 1,
+              bill_gst_to:1,
+              shipped_gst_to:1,
+              shipped_to:1,
             },
           },
         ],
@@ -225,7 +228,7 @@ exports.getAll = TryCatch(async (req, res) => {
         localField: "_id",
         foreignField: "sale_id",
         as: "assinedto",
-        pipeline: [
+        pipeline: [ 
           {
             $lookup: {
               from: "users",
