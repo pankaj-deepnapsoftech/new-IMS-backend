@@ -10,8 +10,10 @@ const {
   resetPassword,
   verifyUser,
   resendOtp,
-  all,
+  all,  
   employeeDetails,
+  updateProfile, 
+  
 } = require("../controllers/user");
 const { verifyOTP } = require("../middlewares/verifyOTP");
 const { isUserVerified } = require("../middlewares/isVerified");
@@ -25,6 +27,7 @@ router.get("/all", isAuthenticated, all);
 // router.get("/all", isAuthenticated, isSuper, all);
 router.post("/verify", verifyOTP, verifyUser);
 router.post("/resend-otp", resendOtp);
+router.patch("/user/profile", isAuthenticated, isAllowed, updateProfile);
 router
   .route("/login")
   .get(isUserVerified, loginWithToken)
@@ -37,5 +40,6 @@ router
 router.post("/reset-password-request", isUserVerified, resetPasswordRequest);
 router.post("/reset-password", isUserVerified, verifyOTP, resetPassword);
 router.get('/user/:_id', isAuthenticated, employeeDetails);
+
 
 module.exports = router;
