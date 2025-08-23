@@ -103,6 +103,7 @@ exports.remove = TryCatch(async (req, res) => {
     message: "User has been deleted successfully",
   });
 });
+
 exports.details = TryCatch(async (req, res) => {
   const userId = req.user._id;
 
@@ -117,6 +118,7 @@ exports.details = TryCatch(async (req, res) => {
     user,
   });
 });
+
 exports.employeeDetails = TryCatch(async (req, res) => {
   const userId = req.params._id;
 
@@ -269,6 +271,7 @@ exports.resetPasswordRequest = TryCatch(async (req, res) => {
     message: "OTP has been successfully sent to your email id",
   });
 });
+
 exports.resetPassword = TryCatch(async (req, res) => {
   const { email, password } = req.body;
 
@@ -347,3 +350,40 @@ exports.all = TryCatch(async (req, res) => {
     users,
   });
 });
+
+
+
+exports.updateProfile = TryCatch(async (req, res) => {
+  const userId = req.user._id;
+  const { address, first_name, last_name, phone,cpny_name,GSTIN,Bank_Name,Account_No,IFSC_Code } = req.body;
+
+  const updatedUser = await User.findByIdAndUpdate(
+    userId,
+    {
+      ...(address && { address }),
+      ...(phone && { phone }),
+      ...(first_name && { first_name }),
+      ...(last_name && { last_name }),
+      ...(cpny_name && {cpny_name}),
+      ...(GSTIN && {GSTIN}),
+      ...(Account_No && { Account_No}),
+      ...(Bank_Name && {Bank_Name}),
+      ...(IFSC_Code && {IFSC_Code}),
+    },
+    { new: true }
+  );
+
+  if (!updatedUser) {
+    throw new ErrorHandler("User not found", 404);
+  }
+
+  updatedUser.password = undefined;
+
+  res.status(200).json({  
+    status: 200,
+    success: true,
+    message: "Profile updated successfully",
+    user: updatedUser,
+  });
+});
+

@@ -50,6 +50,30 @@ const userSchema = new Schema(
       type: Boolean,
       default: false,
     },
+    cpny_name:{
+      type:String,
+      default:"",
+    },
+    address: {
+      type: String,
+      default: "",
+    },
+    GSTIN: {
+      type: String,
+      default: "",
+    },
+    Bank_Name: {
+      type: String,
+      default: "",
+    },
+    Account_No: {
+      type: String,
+      default: "",
+    },
+    IFSC_Code: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,
@@ -86,3 +110,5 @@ userSchema.pre("findOneAndUpdate", async function (next) {
 
 const User = model("User", userSchema);
 module.exports = User;
+
+

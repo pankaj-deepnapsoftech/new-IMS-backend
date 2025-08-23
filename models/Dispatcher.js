@@ -2,25 +2,41 @@ const mongoose = require("mongoose");
 
 const DispatchSchema = new mongoose.Schema(
   {
-    // optional, already there:
     creator: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
-    // existing sale field – leave as-is if you also use sales:
-    Sale_id: [{ type: mongoose.Schema.Types.ObjectId, ref: "Purchase", default: [] }],
-
-    // ✅ NEW: link to the production process
+    Sale_id: [
+      { type: mongoose.Schema.Types.ObjectId, ref: "Purchase", default: [] },
+    ],
     production_process_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "ProductionProcess",
       index: true,
-      required: false
+      required: false,
     },
+    sales_order_id: { type: String, required: true },
+    order_id: { type: String },
+    merchant_name: { type: String },
+    item_name: { type: String },
+    quantity: { type: Number },
+    total_amount: { type: Number },
+    tracking_id: { type: String },
+    tracking_web: { type: String },
+    dispatch_date: { type: Date, default: Date.now },
+    remarks: { type: String },
+    dispatch_qty: { type: Number, required: true },
+    products: [
+      {
+        product_id: { type: String },
+        name: { type: String },
+        category: { type: String },
+        quantity: { type: Number },
+        price: { type: Number },
+      },
+    ],
 
-    // status fields
     delivery_status: { type: String, default: "Dispatch" },
     Task_status: { type: String, default: "Pending" },
   },
-  { timestamps: true, strict: true }
+  { timestamps: true, strict: false }
 );
 
 const DispatchModel = mongoose.model("Dispatch", DispatchSchema);

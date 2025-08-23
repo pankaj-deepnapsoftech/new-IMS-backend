@@ -1041,11 +1041,18 @@ exports.updatePrice = TryCatch(async (req, res) => {
   const currentPrice = product.price || 0;
   const updatedPrice = Number(newPrice); // The price entered by user
   const currentStock = product.current_stock || 0;
-
+  console.log("current Pricee :--> ",currentPrice);
+  console.log("updated price::",updatedPrice)
   // Update the product with new updated_price field instead of replacing current price
   const updatedProduct = await Product.findByIdAndUpdate(
     productId,
-    {
+   {
+      $push: {
+        price_history: {
+          $each: [{ price: updatedPrice, updated_at: new Date() }],
+          $slice: -5, // Keep only the last 5 entries in the array
+        },
+      },
       updated_price: updatedPrice, // Store updated price in new field
       latest_price: updatedPrice, // Update latest price for reference
     },
