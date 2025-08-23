@@ -2,10 +2,12 @@ const { DispatchModel } = require("../models/Dispatcher");
 const { TryCatch, ErrorHandler } = require("../utils/error");
 const ProductionProcess = require("../models/productionProcess");
 const mongoose = require("mongoose");
+const Product = require("../models/product");
 
 exports.CreateDispatch = TryCatch(async (req, res) => {
   const data = req.body;
 
+  // Check if dispatch already exists
   const find = await DispatchModel.findOne({
     sales_order_id: data.sales_order_id,
   });
@@ -25,6 +27,24 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
     throw new ErrorHandler("Valid dispatch quantity is required", 400);
   }
 
+  // ✅ Step 1: Find the product
+  const product = await Product.findById(data.product_id);
+  if (!product) {
+    throw new ErrorHandler("Product not found", 404);
+  }
+
+  // ✅ Step 2: Check stock availability
+  if (product.current_stock < data.dispatch_qty) {
+    throw new ErrorHandler("Insufficient stock for dispatch", 400);
+  }
+
+  // ✅ Step 3: Reduce stock
+  product.current_stock = product.current_stock - data.dispatch_qty;
+  product.change_type = "decrease";
+  product.quantity_changed = data.dispatch_qty;
+  await product.save();
+
+  // ✅ Step 4: Create dispatch record
   const result = await DispatchModel.create({
     ...data,
     creator: req.user._id,
@@ -32,10 +52,12 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
   });
 
   return res.status(201).json({
-    message: "Dispatch created successfully",
+    message: "Dispatch created successfully, stock updated",
     data: result,
+    updated_stock: product.current_stock, // return new stock level
   });
 });
+
 
 exports.GetAllDispatches = TryCatch(async (req, res) => {
   const { page, limit } = req.query;
