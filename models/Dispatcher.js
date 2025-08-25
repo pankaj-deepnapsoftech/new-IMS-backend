@@ -49,6 +49,11 @@ const DispatchSchema = new mongoose.Schema(
       uploadDate: { type: Date, default: Date.now },
     },
 
+    dispatch_status: { 
+      type: String, 
+      enum: ["Dispatch", "Dispatch Pending", "Delivered"], 
+      default: "Dispatch" 
+    },
     delivery_status: { type: String, default: "Dispatch" },
     Task_status: { type: String, default: "Pending" },
   },

@@ -44,6 +44,7 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
     ...data,
     creator: req.user._id,
     dispatch_date: data.dispatch_date || new Date(),
+    dispatch_status: "Dispatch", // Set default status
   });
 
   return res.status(201).json({
@@ -54,14 +55,34 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
 });
 
 exports.GetAllDispatches = TryCatch(async (req, res) => {
-  const { page, limit } = req.query;
+  const { page, limit, dispatch_status, payment_status, search } = req.query;
   const pages = parseInt(page) || 1;
   const limits = parseInt(limit) || 10;
   const skip = (pages - 1) * limits;
 
-  const totalData = await DispatchModel.countDocuments();
+  // Build filter object
+  const filter = {};
+  
+  if (dispatch_status && dispatch_status !== "All") {
+    filter.dispatch_status = dispatch_status;
+  }
+  
+  if (payment_status && payment_status !== "All") {
+    filter.payment_status = payment_status;
+  }
+  
+  if (search) {
+    filter.$or = [
+      { merchant_name: { $regex: search, $options: 'i' } },
+      { item_name: { $regex: search, $options: 'i' } },
+      { sales_order_id: { $regex: search, $options: 'i' } },
+      { order_id: { $regex: search, $options: 'i' } }
+    ];
+  }
 
-  const data = await DispatchModel.find()
+  const totalData = await DispatchModel.countDocuments(filter);
+
+  const data = await DispatchModel.find(filter)
     .populate("creator", "first_name last_name email")
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -212,13 +233,20 @@ exports.UpdateDispatch = TryCatch(async (req, res) => {
     await product.save();
   }
 
+  // If dispatch quantity is being changed, update status to "Dispatch Pending"
+  if (data.dispatch_qty !== undefined && data.dispatch_qty !== existingDispatch.dispatch_qty) {
+    data.dispatch_status = "Dispatch Pending";
+  }
+
   // Update the dispatch record
   const updatedDispatch = await DispatchModel.findByIdAndUpdate(id, data, {
     new: true,
   });
 
   return res.status(200).json({
-    message: "Dispatch updated successfully, inventory adjusted",
+    message: data.dispatch_qty !== undefined && data.dispatch_qty !== existingDispatch.dispatch_qty 
+      ? "Dispatch updated successfully, inventory adjusted, status changed to Dispatch Pending"
+      : "Dispatch updated successfully, inventory adjusted",
     data: updatedDispatch,
     updated_stock:
       data.dispatch_qty !== undefined && data.product_id
@@ -311,10 +339,13 @@ exports.UploadDeliveryProof = TryCatch(async (req, res) => {
     uploadDate: new Date(),
   };
 
+  // Change dispatch status to "Delivered" when delivery proof is uploaded
+  dispatch.dispatch_status = "Delivered";
+
   await dispatch.save();
 
   return res.status(200).json({
-    message: "Delivery proof uploaded successfully",
+    message: "Delivery proof uploaded successfully, status changed to Delivered",
     data: dispatch,
   });
 });
