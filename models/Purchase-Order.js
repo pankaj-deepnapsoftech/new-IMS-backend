@@ -33,6 +33,7 @@ const PurchaseOrderSchema = new mongoose.Schema(
       enum: ["Individual", "Company"],
       default: "Individual",
     },
+    supplier_customerId: { type: String, required: false },
     supplierPan: { type: String, required: false },
     supplierEmail: { type: String, required: false },
     supplierShippedTo: { type: String, required: false },

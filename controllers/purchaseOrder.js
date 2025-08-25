@@ -284,7 +284,7 @@ exports.details = TryCatch(async (req, res) => {
 exports.all = TryCatch(async (req, res) => {
   const purchaseOrders = await PurchaseOrder.find({}).populate(
     "creator",
-    "name email cust_id"
+    "name email",
   );
   res.status(200).json({
     status: 200,
