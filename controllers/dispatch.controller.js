@@ -51,7 +51,7 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
     data: result,
     updated_stock: product.current_stock,
   });
-}); 
+});
 
 exports.GetAllDispatches = TryCatch(async (req, res) => {
   const { page, limit } = req.query;
@@ -290,182 +290,86 @@ exports.SendFromProduction = async (req, res) => {
   }
 };
 
-// exports.GetDispatch = TryCatch(async (req, res) => {
-//     const data = await ProductionProcess.aggregate([
-//       {
-//         $match: {
-//           status: "completed"
-//         }
-//       },
-//       {
-//         $lookup: {
-//           from: "users",
-//           localField: "creator",
-//           foreignField: "_id",
-//           as: "creator",
-//           pipeline: [
-//             {
-//               $lookup: {
-//                 from: "user-roles",
-//                 localField: "role",
-//                 foreignField: "_id",
-//                 as: "role",
-//                 pipeline: [
-//                   {
-//                     $project: {
-//                       role: 1
-//                     }
-//                   }
-//                 ]
-//               }
-//             },
-//             {
-//               $project: {
-//                 role: 1,
-//                 first_name: 1
-//               }
-//             }
-//           ]
-//         }
-//       },
-//       {
-//         $lookup: {
-//           from: "products",
-//           localField: "item",
-//           foreignField: "_id",
-//           as: "item",
-//           pipeline: [
-//             {
-//               $project: {
-//                 name: 1
-//               }
-//             }
-//           ]
-//         }
-//       },
-//       {
-//         $lookup: {
-//           from: "boms",
-//           localField: "bom",
-//           foreignField: "_id",
-//           as: "bom",
-//           pipeline: [
-//             {
-//               $lookup: {
-//                 from: "purchases",
-//                 localField: "sale_id",
-//                 foreignField: "_id",
-//                 as: "sale_id",
-//                 pipeline: [
-//                   {
-//                     $lookup: {
-//                       from: "users",
-//                       foreignField: "_id",
-//                       localField: "user_id",
-//                       as: "user_id",
-//                       pipeline: [
-//                         {
-//                           $lookup: {
-//                             from: "user-roles",
-//                             localField: "role",
-//                             foreignField: "_id",
-//                             as: "role",
-//                             pipeline: [
-//                               {
-//                                 $project: {
-//                                   role: 1
-//                                 }
-//                               }
-//                             ]
-//                           }
-//                         },
-//                         {
-//                           $project: {
-//                             role: 1,
-//                             first_name: 1
-//                           }
-//                         }
-//                       ]
-//                     }
-//                   },
-//                   {
-//                     $lookup: {
-//                       from: "parties",
-//                   localField: "party",
-//                   foreignField: "_id",
-//                       as: "customer_id",
-//                       pipeline: [
-//                         {
-//                           $project: {
-//                             full_name: 1
-//                           }
-//                         }
-//                       ]
-//                     }
-//                   },
-//                   {
-//                     $lookup: {
-//                       from: "products",
-//                       localField: "product_id",
-//                       foreignField: "_id",
-//                       as: "product_id",
-//                       pipeline: [
-//                         {
-//                           $project: {
-//                             name: 1
-//                           }
-//                         }
-//                       ]
-//                     }
-//                   },
-//                 ]
-//               }
-//             },
-//             {
-//               $project: {
-//                 sale_id: 1
-//               }
-//             }
-//           ]
-//         }
-//       },
-//       {
-//         $project: {
-//           creator: 1,
-//           item: 1,
-//           bom: 1,
-//           status: 1
-//         }
-//       },
-//       {
-//         $unwind: "$bom"
-//       },
-//       {
-//         $group: {
-//           _id: "$bom.sale_id",
-//           bom: { $first: "$bom" },
-//           creator: { $first: "$creator" },
-//           item: { $first: "$item" },
-//           status: { $first: "$status" }
-//         }
-//       },
-//       {
-//         $sort: {
-//           "bom.sale_id.updatedAt": -1
-//         }
-//       },
-//       {
-//         $project: {
-//           creator: 1,
-//           item: 1,
-//           bom: 1,
-//           status: 1
-//         }
-//       }
-//     ]);
+exports.UploadDeliveryProof = TryCatch(async (req, res) => {
+  const { id } = req.params;
 
-//     return res.status(200).json({
-//       message: "data",
-//       data
-//     });
-// });
+  if (!req.file) {
+    throw new ErrorHandler("No file uploaded", 400);
+  }
+
+  const dispatch = await DispatchModel.findById(id);
+  if (!dispatch) {
+    throw new ErrorHandler("Dispatch not found", 404);
+  }
+
+  // Update dispatch with delivery proof information
+  dispatch.delivery_proof = {
+    filename: req.file.filename,
+    originalName: req.file.originalname,
+    mimetype: req.file.mimetype,
+    size: req.file.size,
+    uploadDate: new Date(),
+  };
+
+  await dispatch.save();
+
+  return res.status(200).json({
+    message: "Delivery proof uploaded successfully",
+    data: dispatch,
+  });
+});
+
+exports.UploadInvoice = TryCatch(async (req, res) => {
+  const { id } = req.params;
+
+  if (!req.file) {
+    throw new ErrorHandler("No file uploaded", 400);
+  }
+
+  const dispatch = await DispatchModel.findById(id);
+  if (!dispatch) {
+    throw new ErrorHandler("Dispatch not found", 404);
+  }
+
+  dispatch.invoice = {
+    filename: req.file.filename,
+    originalName: req.file.originalname,
+    mimetype: req.file.mimetype,
+    size: req.file.size,
+    uploadDate: new Date(),
+  };
+
+  await dispatch.save();
+
+  return res.status(200).json({
+    message: "Invoice uploaded successfully",
+    data: dispatch,
+  });
+});
+
+exports.DownloadFile = TryCatch(async (req, res) => {
+  const { id, type } = req.params;
+
+  const dispatch = await DispatchModel.findById(id);
+  if (!dispatch) {
+    throw new ErrorHandler("Dispatch not found", 404);
+  }
+
+  let fileData;
+  if (type === "delivery-proof") {
+    fileData = dispatch.delivery_proof;
+  } else if (type === "invoice") {
+    fileData = dispatch.invoice;
+  } else {
+    throw new ErrorHandler("Invalid file type", 400);
+  }
+
+  if (!fileData || !fileData.filename) {
+    throw new ErrorHandler("File not found", 404);
+  }
+
+  const path = require("path");
+  const filePath = path.join(__dirname, "../uploads", fileData.filename);
+
+  res.download(filePath, fileData.originalName);
+});

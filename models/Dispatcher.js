@@ -33,8 +33,7 @@ const DispatchSchema = new mongoose.Schema(
         price: { type: Number },
       },
     ],
-    
-    // File upload fields
+
     delivery_proof: {
       filename: { type: String },
       originalName: { type: String },
