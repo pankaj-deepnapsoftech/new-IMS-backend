@@ -51,7 +51,7 @@ exports.CreateDispatch = TryCatch(async (req, res) => {
     data: result,
     updated_stock: product.current_stock,
   });
-});
+}); 
 
 exports.GetAllDispatches = TryCatch(async (req, res) => {
   const { page, limit } = req.query;
@@ -184,23 +184,30 @@ exports.UpdateDispatch = TryCatch(async (req, res) => {
 
   if (data.dispatch_qty !== undefined && data.product_id) {
     const newDispatchQty = parseInt(data.dispatch_qty);
+    const previousDispatchQty = parseInt(existingDispatch.dispatch_qty) || 0;
 
     const product = await Product.findById(data.product_id);
     if (!product) {
       throw new ErrorHandler("Product not found", 404);
     }
 
-    if (product.current_stock < newDispatchQty) {
-      throw new ErrorHandler(
-        `Insufficient stock. Available: ${product.current_stock}, Required: ${newDispatchQty}`,
-        400
-      );
+    // Calculate the difference in dispatch quantity
+    const dispatchDifference = newDispatchQty - previousDispatchQty;
+
+    // If increasing dispatch quantity, check if we have enough stock
+    if (dispatchDifference > 0) {
+      if (product.current_stock < dispatchDifference) {
+        throw new ErrorHandler(
+          `Insufficient stock. Available: ${product.current_stock}, Required additional: ${dispatchDifference}`,
+          400
+        );
+      }
     }
 
-    // 🚨 Always subtract the NEW dispatch qty (cumulative behavior)
-    product.current_stock = product.current_stock - newDispatchQty;
-    product.change_type = "decrease";
-    product.quantity_changed = newDispatchQty;
+    // Update stock based on the difference
+    product.current_stock = product.current_stock - dispatchDifference;
+    product.change_type = dispatchDifference > 0 ? "decrease" : "increase";
+    product.quantity_changed = Math.abs(dispatchDifference);
 
     await product.save();
   }
@@ -211,7 +218,7 @@ exports.UpdateDispatch = TryCatch(async (req, res) => {
   });
 
   return res.status(200).json({
-    message: "Dispatch updated successfully, inventory decreased",
+    message: "Dispatch updated successfully, inventory adjusted",
     data: updatedDispatch,
     updated_stock:
       data.dispatch_qty !== undefined && data.product_id
@@ -219,7 +226,6 @@ exports.UpdateDispatch = TryCatch(async (req, res) => {
         : null,
   });
 });
-
 
 // exports.UpdateDispatch = TryCatch(async (req, res) => {
 //   const { id } = req.params;

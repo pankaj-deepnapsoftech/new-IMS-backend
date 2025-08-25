@@ -23,6 +23,7 @@ const DispatchSchema = new mongoose.Schema(
     dispatch_date: { type: Date, default: Date.now },
     remarks: { type: String },
     dispatch_qty: { type: Number, required: true },
+    product_id: { type: String },
     products: [
       {
         product_id: { type: String },
@@ -32,6 +33,22 @@ const DispatchSchema = new mongoose.Schema(
         price: { type: Number },
       },
     ],
+    
+    // File upload fields
+    delivery_proof: {
+      filename: { type: String },
+      originalName: { type: String },
+      mimetype: { type: String },
+      size: { type: Number },
+      uploadDate: { type: Date, default: Date.now },
+    },
+    invoice: {
+      filename: { type: String },
+      originalName: { type: String },
+      mimetype: { type: String },
+      size: { type: Number },
+      uploadDate: { type: Date, default: Date.now },
+    },
 
     delivery_status: { type: String, default: "Dispatch" },
     Task_status: { type: String, default: "Pending" },
