@@ -167,10 +167,25 @@ exports.details = TryCatch(async (req, res) => {
     invoice: invoice._doc,
   });
 });
+// exports.all = TryCatch(async (req, res) => {
+//   const Invoices = await Invoice.find().populate(
+//     "creator buyer supplier store", { path: "items.item" } // Populate the item field within each object in the items array
+//   );
+
+//   res.status(200).json({
+//     status: 200,
+//     success: true,
+//     invoices: Invoices,
+//   });
+// });
 exports.all = TryCatch(async (req, res) => {
-  const Invoices = await Invoice.find().populate(
-    "creator buyer supplier store"
-  );
+  const Invoices = await Invoice.find().populate([
+    "creator",
+    "buyer",
+    "supplier",
+    "store",
+    { path: "items.item" } // Populate the item field within each object in the items array
+  ]);
 
   res.status(200).json({
     status: 200,
