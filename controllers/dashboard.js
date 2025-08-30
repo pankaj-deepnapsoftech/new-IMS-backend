@@ -13,10 +13,12 @@ const { TryCatch } = require("../utils/error");
 const BOMScrapMaterial = require("../models/bom-scrap-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
 const { Purchase } = require("../models/purchase");
-
+const {DispatchModel}  = require('../models/Dispatcher')
 exports.summary = TryCatch(async (req, res) => {
+  // Here we have to send the view also
   let { from, to } = req.body;
-
+  console.log("from",from)
+  console.log("view ",to)
   if (from && to) {
     from = moment(from)
       .set({ hour: 0, minute: 0, second: 0, millisecond: 0 })
@@ -31,7 +33,7 @@ exports.summary = TryCatch(async (req, res) => {
     .toDate();
   const todayForBom = moment().endOf("day").toDate();
 
-  // Products Summary
+      // Products Summary
   const productsPipeline = [
     {
       $project: {
@@ -462,6 +464,7 @@ exports.summary = TryCatch(async (req, res) => {
   res.status(200).json({
     status: 200,
     success: true,
+     
     products: products,
     stores: {
       total_store_count: storeCount,
@@ -486,7 +489,6 @@ exports.summary = TryCatch(async (req, res) => {
     total_sales_amount: totalSalesAmount,
     total_product_buy_price: totalProductBuyPriceLastMonth,
 
-
     processes: processCountStatusWiseObj,
     proforma_invoices: totalProformaInvoices,
     invoice_summary: {
@@ -505,3 +507,1217 @@ exports.summary = TryCatch(async (req, res) => {
         : wipInventory,
   });
 });
+
+exports.salesData = TryCatch(async (req, res) => {
+  const view = req.query.view || "yearly"; // Default yearly
+  const currentYear = new Date().getFullYear();
+  const prevYear = currentYear - 1;
+  const currentDate = new Date(); // current system date
+  let labels = [];
+  let datasets = [];
+  let totalSales = 0; // Total sales variable add kiya
+  
+  function getISOWeek(date) {
+    const tmp = new Date(date.getTime());
+    tmp.setHours(0, 0, 0, 0);
+    tmp.setDate(tmp.getDate() + 3 - ((tmp.getDay() + 6) % 7));
+    const week1 = new Date(tmp.getFullYear(), 0, 4);
+    return (
+      1 +
+      Math.round(
+        ((tmp.getTime() - week1.getTime()) / 86400000 -
+          3 +
+          ((week1.getDay() + 6) % 7)) /
+          7
+      )
+    );
+  }
+
+  switch (view) {
+    //GET /api/salesData?view=yearly&year=2025
+    case "yearly": {
+      labels = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
+
+      const currentYear = Number(req.query.year) || new Date().getFullYear();
+      const prevYear = currentYear - 1;
+
+      // Prev Year Sales count (group by month)
+      const prevSales = await Purchase.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: new Date(`${prevYear}-01-01`),
+              $lt: new Date(`${prevYear + 1}-01-01`),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            total: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]);
+
+      // Current Year Sales count
+      const currSales = await Purchase.aggregate([
+        {
+          $match: {
+            createdAt: {
+              $gte: new Date(`${currentYear}-01-01`),
+              $lt: new Date(`${currentYear + 1}-01-01`),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            total: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]);
+
+      // Total sales for current year calculate karo
+      totalSales = currSales.reduce((sum, item) => sum + item.total, 0);
+
+      const prevData = Array(12).fill(0);
+      const currData = Array(12).fill(0);
+
+      prevSales.forEach((item) => {
+        prevData[item._id - 1] = item.total;
+      });
+      currSales.forEach((item) => {
+        currData[item._id - 1] = item.total;
+      });
+
+      datasets = [
+        { label: String(prevYear), data: prevData },
+        { label: String(currentYear), data: currData },
+      ];
+
+      break;
+    }
+
+    // GET /api/salesData?view=monthly&month=jan&year=2025
+    case "monthly": {
+      const monthMap = {
+        jan: 1,
+        feb: 2,
+        mar: 3,
+        apr: 4,
+        may: 5,
+        jun: 6,
+        jul: 7,
+        aug: 8,
+        sep: 9,
+        oct: 10,
+        nov: 11,
+        dec: 12,
+      };
+
+      const monthNames = [
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December",
+      ];
+
+      const monthStr = (req.query.month || "").toLowerCase();
+      const currentMonth = monthMap[monthStr] || currentDate.getMonth() + 1;
+
+      let currMonthYear = Number(req.query.year) || currentDate.getFullYear();
+      let prevMonth = currentMonth - 1;
+      let prevMonthYear = currMonthYear;
+
+      if (prevMonth === 0) {
+        prevMonth = 12;
+        prevMonthYear -= 1;
+      }
+
+      const daysInMonth = new Date(currMonthYear, currentMonth, 0).getDate();
+      labels = Array.from({ length: daysInMonth }, (_, i) => `${i + 1}`);
+
+      const prevStart = new Date(prevMonthYear, prevMonth - 1, 1);
+      const prevEnd = new Date(prevMonthYear, prevMonth, 1);
+
+      const currStart = new Date(currMonthYear, currentMonth - 1, 1);
+      const currEnd = new Date(currMonthYear, currentMonth, 1);
+
+      const prevSales = await Purchase.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: prevStart, $lt: prevEnd },
+          },
+        },
+        {
+          $group: {
+            _id: { $dayOfMonth: "$createdAt" },
+            total: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]);
+
+      const currSales = await Purchase.aggregate([
+        {
+          $match: {
+            createdAt: { $gte: currStart, $lt: currEnd },
+          },
+        },
+        {
+          $group: {
+            _id: { $dayOfMonth: "$createdAt" },
+            total: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]);
+
+      // Total sales for current month calculate karo
+      totalSales = currSales.reduce((sum, item) => sum + item.total, 0);
+
+      const prevData = Array(daysInMonth).fill(0);
+      const currData = Array(daysInMonth).fill(0);
+
+      prevSales.forEach((item) => {
+        if (item._id <= daysInMonth) {
+          prevData[item._id - 1] = item.total;
+        }
+      });
+
+      currSales.forEach((item) => {
+        currData[item._id - 1] = item.total;
+      });
+
+      datasets = [
+        { label: monthNames[prevMonth - 1], data: prevData },
+        { label: monthNames[currentMonth - 1], data: currData },
+      ];
+
+      break;
+    }
+
+    //  http://localhost:8085/api/dashboard/sales?view=weekly&month=aug
+   case "weekly": {
+  const monthMap = {
+    jan: 1,
+    feb: 2,
+    mar: 3,
+    apr: 4,
+    may: 5,
+    jun: 6,
+    jul: 7,
+    aug: 8,
+    sep: 9,
+    oct: 10,
+    nov: 11,
+    dec: 12,
+  };
+
+  // Determine month from query parameter, default to current month if not provided or invalid
+  const monthStr = (req.query.month || "").toLowerCase();
+  const month = monthMap[monthStr] || Number(req.query.month) || currentDate.getMonth() + 1;
+  const year = Number(req.query.year) || currentDate.getFullYear();
+
+  // Calculate date ranges
+  const startOfCurrentMonth = new Date(year, month - 1, 1);
+  const endOfCurrentMonth = new Date(year, month, 0, 23, 59, 59, 999);
+
+  // Handle previous month with year adjustment
+  let prevMonth = month - 1;
+  let prevYear = year;
+  if (prevMonth === 0) {
+    prevMonth = 12;
+    prevYear = year - 1;
+  }
+  
+  const startOfPrevMonth = new Date(prevYear, prevMonth - 1, 1);
+  const endOfPrevMonth = new Date(prevYear, prevMonth, 0, 23, 59, 59, 999);
+
+  // Function to get week numbers in a month (W1, W2, W3, W4)
+  const getWeekNumbersForMonth = (start, end) => {
+    const weeks = [];
+    let current = new Date(start);
+    
+    // Always start with W1 for the first week of the month
+    let weekCount = 1;
+    
+    while (current <= end) {
+      weeks.push(`W${weekCount}`);
+      weekCount++;
+      // Move to next week
+      current.setDate(current.getDate() + 7);
+    }
+    
+    return weeks;
+  };
+
+  // Get week labels for both months
+  const prevMonthWeeks = getWeekNumbersForMonth(startOfPrevMonth, endOfPrevMonth);
+  const currMonthWeeks = getWeekNumbersForMonth(startOfCurrentMonth, endOfCurrentMonth);
+  
+  // Create combined labels (W1, W2, W3, W4 for both months)
+  labels = [...prevMonthWeeks, ...currMonthWeeks];
+
+  // Previous month sales by week
+  const prevSales = await Purchase.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startOfPrevMonth, $lte: endOfPrevMonth },
+      },
+    },
+    {
+      $addFields: {
+        weekOfMonth: {
+          $ceil: {
+            $divide: [{ $dayOfMonth: "$createdAt" }, 7]
+          }
+        }
+      }
+    },
+    {
+      $group: {
+        _id: "$weekOfMonth",
+        total: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // Current month sales by week
+  const currSales = await Purchase.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: startOfCurrentMonth, $lte: endOfCurrentMonth },
+      },
+    },
+    {
+      $addFields: {
+        weekOfMonth: {
+          $ceil: {
+            $divide: [{ $dayOfMonth: "$createdAt" }, 7]
+          }
+        }
+      }
+    },
+    {
+      $group: {
+        _id: "$weekOfMonth",
+        total: { $sum: 1 },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  // Total sales for current month
+  const totalSales = currSales.reduce((sum, item) => sum + (item.total || 0), 0);
+
+  // Prepare data arrays
+  const prevData = Array(prevMonthWeeks.length).fill(0);
+  const currData = Array(currMonthWeeks.length).fill(0);
+
+  // Fill data arrays
+  prevSales.forEach((item) => {
+    if (item._id <= prevData.length) {
+      prevData[item._id - 1] = item.total || 0;
+    }
+  });
+
+  currSales.forEach((item) => {
+    if (item._id <= currData.length) {
+      currData[item._id - 1] = item.total || 0;
+    }
+  });
+
+  datasets = [
+    {
+      label: `${startOfPrevMonth.toLocaleString("default", { month: "short" })} ${prevYear}`,
+      data: prevData,
+    },
+    {
+      label: `${startOfCurrentMonth.toLocaleString("default", { month: "short" })} ${year}`,
+      data: currData,
+    },
+  ];
+
+  break;
+}
+    default: {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid view type. Use 'yearly', 'monthly', 'weekly' or 'daily'.",
+      });
+    }
+  }
+  
+  // Response mein totalSales add karo
+  res.status(200).json({
+    success: true,
+    data: "mil rha hai----",
+    labels,
+    datasets,
+    totalSales // Total sales response mein add kiya
+  });
+});
+
+
+// ***************************************************** Dispatch Api*****************
+// Yearly data
+// GET /api/dispatch-data?view=yearly&year=2024
+
+// Monthly data with number
+// GET /api/dispatch-data?view=monthly&year=2024&month=8
+// Monthly data with name
+// GET /api/dispatch-data?view=monthly&year=2024&month=august
+// GET /api/dispatch-data?view=monthly&year=2024&month=aug
+
+// Current week in current month
+// GET /api/dispatch-data?view=weekly
+ 
+exports.dispatchData = TryCatch(async (req, res) => {
+    const { view, year, month } = req.query;
+
+    // Input validation
+    if (!view || !['yearly', 'monthly', 'weekly'].includes(view)) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Invalid view. Use yearly, monthly, or weekly.' 
+        });
+    }
+
+        // For weekly view, we don't need year/month parameters - always use current rolling week
+        if (view === 'weekly') {
+            // Skip year/month validation for weekly - it's always current
+        } else {
+            // Year validation for monthly and yearly
+            if (!year || isNaN(year)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Valid year is required.' 
+                });
+            }
+        }
+
+    const yearNum = year ? parseInt(year) : new Date().getFullYear();
+    const currentYear = new Date().getFullYear();
+    
+    if (view !== 'weekly' && (yearNum < 2000 || yearNum > currentYear + 1)) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Year should be between 2000 and ' + (currentYear + 1) 
+        });
+    }
+
+    let startDate, endDate;
+
+    try {
+        // Set date range based on view
+        switch (view) {
+            case 'yearly':
+                startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);                  
+                endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);            
+                break;
+
+            case 'monthly':
+                if (!month) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'Month is required for monthly view.' 
+                    });
+                }
+
+                // Improved month parsing
+                let monthIndex;
+                if (isNaN(month)) {
+                    const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+                                       'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+                    const monthStr = month.toLowerCase().substring(0, 3);
+                    monthIndex = monthNames.indexOf(monthStr);
+                    
+                    if (monthIndex === -1) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Invalid month format. Use month name or number (1-12).' 
+                        });
+                    }
+                } else {
+                    monthIndex = parseInt(month) - 1;
+                    if (monthIndex < 0 || monthIndex > 11) {
+                        return res.status(400).json({ 
+                            success: false, 
+                            message: 'Month should be between 1-12.' 
+                        });
+                    }
+                }
+
+                startDate = new Date(yearNum, monthIndex, 1, 0, 0, 0, 0);        
+                endDate = new Date(yearNum, monthIndex + 1, 0, 23, 59, 59, 999); 
+                break;
+
+            case 'weekly':
+                // Rolling 7-day window: 3 days back + today + 3 days forward
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                // Start: 3 days before today
+                const weekStartDate = new Date(today);
+                weekStartDate.setDate(today.getDate() - 3);
+                weekStartDate.setHours(0, 0, 0, 0);
+                
+                // End: 3 days after today
+                const weekEndDate = new Date(today);
+                weekEndDate.setDate(today.getDate() + 3);
+                weekEndDate.setHours(23, 59, 59, 999);
+
+                startDate = weekStartDate;
+                endDate = weekEndDate;
+                break;
+        }
+
+        // Validate dates
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            throw new Error('Invalid date created');
+        }
+
+    } catch (error) {
+        console.error('Date creation error:', error);
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Invalid date parameters.' 
+        });
+    }
+
+    try {
+        // Fetch and aggregate data
+        const totalData = await DispatchModel.find({
+            createdAt: { $gte: startDate, $lte: endDate }
+        });
+
+        console.log('Total Data Count:', totalData.length); // Debug: Check data count
+        console.log('Date Range:', { startDate, endDate }); // Debug: Check date range
+
+        let categories, data = {};
+
+        switch (view) {
+            case 'yearly':
+                categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                             'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                
+                totalData.forEach(item => {
+                    if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+                        console.warn('Invalid createdAt date:', item.createdAt);
+                        return;
+                    }
+                    
+                    const month = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short' });
+                    const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+                    console.log('Processing - Month:', month, 'Status:', status); // Debug
+                    
+                    if (!data[month]) {
+                        data[month] = { dispatch: 0, deliver: 0 };
+                    }
+                    
+                    if (status === 'dispatch') {
+                        data[month].dispatch++;
+                    } else if (status === 'delivered') {
+                        data[month].deliver++;
+                    }
+                });
+                break;
+
+            case 'monthly':
+                const numDays = endDate.getDate();
+                categories = Array.from({ length: numDays }, (_, i) => String(i + 1));
+                
+                totalData.forEach(item => {
+                    if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+                        console.warn('Invalid createdAt date:', item.createdAt);
+                        return;
+                    }
+                    
+                    const day = new Date(item.createdAt).getDate().toString();
+                    const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+                    console.log('Processing - Day:', day, 'Status:', status); // Debug
+                    
+                    if (!data[day]) {
+                        data[day] = { dispatch: 0, deliver: 0 };
+                    }
+                    
+                    if (status === 'dispatch') {
+                        data[day].dispatch++;
+                    } else if (status === 'delivered') {
+                        data[day].deliver++;
+                    }
+                });
+                break;
+
+            case 'weekly':
+                // Rolling 7-day window: 3 days back + today + 3 days forward
+                const today = new Date();
+                const todayDateString = today.toDateString();
+                
+                // Create 7-day labels with actual dates and day names
+                categories = [];
+                const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                
+                // Generate labels for 7 days (-3 to +3)
+                for (let i = -3; i <= 3; i++) {
+                    const currentDay = new Date(today);
+                    currentDay.setDate(today.getDate() + i);
+                    
+                    const dayName = dayNames[currentDay.getDay()];
+                    const dateNum = currentDay.getDate();
+                    const monthName = currentDay.toLocaleDateString('en-US', { month: 'short' });
+                    
+                    let label;
+                    if (i === 0) {
+                        // Today's label - make it special
+                        label = `Today ${dateNum}`;
+                    } else {
+                        label = `${dayName} ${dateNum}`;
+                    }
+                    
+                    categories.push(label);
+                }
+                
+                totalData.forEach(item => {
+                    if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+                        console.warn('Invalid createdAt date:', item.createdAt);
+                        return;
+                    }
+                    
+                    const itemDate = new Date(item.createdAt);
+                    const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+                    // Find which day index this item belongs to (-3 to +3)
+                    const daysDiff = Math.floor((itemDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    if (daysDiff >= -3 && daysDiff <= 3) {
+                        const dayIndex = daysDiff + 3; // Convert to 0-6 index
+                        const dayKey = categories[dayIndex];
+                        
+                        console.log('Processing - Day:', dayKey, 'Status:', status, 'Diff:', daysDiff); // Debug
+                        
+                        if (!data[dayKey]) {
+                            data[dayKey] = { dispatch: 0, deliver: 0 };
+                        }
+                        
+                        if (status === 'dispatch') {
+                            data[dayKey].dispatch++;
+                        } else if (status === 'delivered') {
+                            data[dayKey].deliver++;
+                        }
+                    }
+                });
+                break;
+        }
+
+        // Fill missing categories with zero
+        categories.forEach(cat => {
+            if (!data[cat]) {
+                data[cat] = { dispatch: 0, deliver: 0 };
+            }
+        });
+
+        // Build response arrays
+        const dispatchData = categories.map(cat => data[cat].dispatch);
+        const deliverData = categories.map(cat => data[cat].deliver);
+
+        // Calculate totals for additional info
+        const totalDispatched = dispatchData.reduce((sum, val) => sum + val, 0);
+        const totalDelivered = deliverData.reduce((sum, val) => sum + val, 0);
+
+        const response = {
+            success: true,
+            title: view.charAt(0).toUpperCase() + view.slice(1),
+            labels: categories,
+            datasets: [
+                {
+                    label: 'Dispatch',
+                    data: dispatchData,
+                    backgroundColor: '#ADD8E6',
+                    borderColor: '#87CEEB',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Deliver',
+                    data: deliverData,
+                    backgroundColor: '#FFC0CB',
+                    borderColor: '#FFB6C1',
+                    borderWidth: 1
+                }
+            ],
+            summary: {
+                totalDispatched,
+                totalDelivered,
+                totalOrders: totalDispatched + totalDelivered,
+                period: view === 'yearly' ? `Year ${year}` : 
+                        view === 'monthly' ? `${month}/${year}` :
+                        `Rolling 7 Days (${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })})`,
+                weekInfo: view === 'weekly' ? {
+                    weekStart: startDate.toISOString().split('T')[0],
+                    weekEnd: endDate.toISOString().split('T')[0],
+                    centerDate: new Date().toISOString().split('T')[0], // Today's date
+                    type: 'rolling_week'
+                } : undefined
+            }
+        };
+
+        console.log('Response Summary:', response.summary); // Debug
+        res.status(200).json(response);
+
+    } catch (error) {
+        console.error('Database or processing error:', error);
+        return res.status(500).json({ 
+            success: false, 
+            message: 'Internal server error while fetching data.' 
+        });
+    }
+});
+
+//     const { view, year, month } = req.query;
+
+//     // Input validation
+//     if (!view || !['yearly', 'monthly', 'weekly'].includes(view)) {
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Invalid view. Use yearly, monthly, or weekly.' 
+//         });
+//     }
+
+//     // Year validation
+//     if (!year || isNaN(year)) {
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Valid year is required.' 
+//         });
+//     }
+
+//     const yearNum = parseInt(year);
+//     const currentYear = new Date().getFullYear();
+    
+//     if (yearNum < 2000 || yearNum > currentYear + 1) {
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Year should be between 2000 and ' + (currentYear + 1) 
+//         });
+//     }
+
+//     let startDate, endDate;
+
+//     try {
+//         // Set date range based on view
+//         switch (view) {
+//             case 'yearly':
+//                 startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);                  
+//                 endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);            
+//                 break;
+
+//             case 'monthly':
+//                 if (!month) {
+//                     return res.status(400).json({ 
+//                         success: false, 
+//                         message: 'Month is required for monthly view.' 
+//                     });
+//                 }
+
+//                 // Improved month parsing
+//                 let monthIndex;
+//                 if (isNaN(month)) {
+//                     const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+//                                        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+//                     const monthStr = month.toLowerCase().substring(0, 3);
+//                     monthIndex = monthNames.indexOf(monthStr);
+                    
+//                     if (monthIndex === -1) {
+//                         return res.status(400).json({ 
+//                             success: false, 
+//                             message: 'Invalid month format. Use month name or number (1-12).' 
+//                         });
+//                     }
+//                 } else {
+//                     monthIndex = parseInt(month) - 1;
+//                     if (monthIndex < 0 || monthIndex > 11) {
+//                         return res.status(400).json({ 
+//                             success: false, 
+//                             message: 'Month should be between 1-12.' 
+//                         });
+//                     }
+//                 }
+
+//                 startDate = new Date(yearNum, monthIndex, 1, 0, 0, 0, 0);        
+//                 endDate = new Date(yearNum, monthIndex + 1, 0, 23, 59, 59, 999); 
+//                 break;
+
+//             case 'weekly':
+//                 if (!month) {
+//                     return res.status(400).json({ 
+//                         success: false, 
+//                         message: 'Month is required for weekly view to determine current week.' 
+//                     });
+//                 }
+
+//                 // Parse month for weekly view
+//                 let weekMonthIndex;
+//                 if (isNaN(month)) {
+//                     const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+//                                        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+//                     const monthStr = month.toLowerCase().substring(0, 3);
+//                     weekMonthIndex = monthNames.indexOf(monthStr);
+                    
+//                     if (weekMonthIndex === -1) {
+//                         return res.status(400).json({ 
+//                             success: false, 
+//                             message: 'Invalid month format. Use month name or number (1-12).' 
+//                         });
+//                     }
+//                 } else {
+//                     weekMonthIndex = parseInt(month) - 1;
+//                     if (weekMonthIndex < 0 || weekMonthIndex > 11) {
+//                         return res.status(400).json({ 
+//                             success: false, 
+//                             message: 'Month should be between 1-12.' 
+//                         });
+//                     }
+//                 }
+
+//                 // Get current date or first day of specified month
+//                 const now = new Date();
+//                 const currentDate = (yearNum === now.getFullYear() && weekMonthIndex === now.getMonth()) 
+//                     ? now 
+//                     : new Date(yearNum, weekMonthIndex, 1);
+
+//                 // Find the start of current week (Monday)
+//                 const currentDay = currentDate.getDay();
+//                 const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay; // Handle Sunday (0) as last day
+                
+//                 const weekStartDate = new Date(currentDate);
+//                 weekStartDate.setDate(currentDate.getDate() + mondayOffset);
+//                 weekStartDate.setHours(0, 0, 0, 0);
+
+//                 // End of week (Sunday)
+//                 const weekEndDate = new Date(weekStartDate);
+//                 weekEndDate.setDate(weekStartDate.getDate() + 6);
+//                 weekEndDate.setHours(23, 59, 59, 999);
+
+//                 startDate = weekStartDate;
+//                 endDate = weekEndDate;
+//                 break;
+//         }
+
+//         // Validate dates
+//         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+//             throw new Error('Invalid date created');
+//         }
+
+//     } catch (error) {
+//         console.error('Date creation error:', error);
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Invalid date parameters.' 
+//         });
+//     }
+
+//     try {
+//         // Fetch and aggregate data
+//         const totalData = await DispatchModel.find({
+//             createdAt: { $gte: startDate, $lte: endDate }
+//         });
+
+//         console.log('Total Data Count:', totalData.length); // Debug: Check data count
+//         console.log('Date Range:', { startDate, endDate }); // Debug: Check date range
+
+//         let categories, data = {};
+
+//         switch (view) {
+//             case 'yearly':
+//                 categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+//                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                
+//                 totalData.forEach(item => {
+//                     if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+//                         console.warn('Invalid createdAt date:', item.createdAt);
+//                         return;
+//                     }
+                    
+//                     const month = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short' });
+//                     const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+//                     console.log('Processing - Month:', month, 'Status:', status); // Debug
+                    
+//                     if (!data[month]) {
+//                         data[month] = { dispatch: 0, deliver: 0 };
+//                     }
+                    
+//                     if (status === 'dispatch') {
+//                         data[month].dispatch++;
+//                     } else if (status === 'delivered') {
+//                         data[month].deliver++;
+//                     }
+//                 });
+//                 break;
+
+//             case 'monthly':
+//                 const numDays = endDate.getDate();
+//                 categories = Array.from({ length: numDays }, (_, i) => String(i + 1));
+                
+//                 totalData.forEach(item => {
+//                     if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+//                         console.warn('Invalid createdAt date:', item.createdAt);
+//                         return;
+//                     }
+                    
+//                     const day = new Date(item.createdAt).getDate().toString();
+//                     const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+//                     console.log('Processing - Day:', day, 'Status:', status); // Debug
+                    
+//                     if (!data[day]) {
+//                         data[day] = { dispatch: 0, deliver: 0 };
+//                     }
+                    
+//                     if (status === 'dispatch') {
+//                         data[day].dispatch++;
+//                     } else if (status === 'delivered') {
+//                         data[day].deliver++;
+//                     }
+//                 });
+//                 break;
+
+//             case 'weekly':
+//                 // Create 7-day labels with day names and dates
+//                 const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+//                 categories = [];
+                
+//                 // Generate labels for the week
+//                 for (let i = 0; i < 7; i++) {
+//                     const currentWeekDay = new Date(startDate);
+//                     currentWeekDay.setDate(startDate.getDate() + i);
+//                     const dayName = dayNames[i];
+//                     const dateStr = currentWeekDay.getDate();
+//                     categories.push(`${dayName} ${dateStr}`);
+//                 }
+                
+//                 totalData.forEach(item => {
+//                     if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+//                         console.warn('Invalid createdAt date:', item.createdAt);
+//                         return;
+//                     }
+                    
+//                     const itemDate = new Date(item.createdAt);
+//                     const dayName = itemDate.toLocaleDateString('en-US', { weekday: 'short' });
+//                     const dateNum = itemDate.getDate();
+//                     const dayKey = `${dayName} ${dateNum}`;
+//                     const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+//                     console.log('Processing - Day:', dayKey, 'Status:', status); // Debug
+                    
+//                     if (!data[dayKey]) {
+//                         data[dayKey] = { dispatch: 0, deliver: 0 };
+//                     }
+                    
+//                     if (status === 'dispatch') {
+//                         data[dayKey].dispatch++;
+//                     } else if (status === 'delivered') {
+//                         data[dayKey].deliver++;
+//                     }
+//                 });
+//                 break;
+//         }
+
+//         // Fill missing categories with zero
+//         categories.forEach(cat => {
+//             if (!data[cat]) {
+//                 data[cat] = { dispatch: 0, deliver: 0 };
+//             }
+//         });
+
+//         // Build response arrays
+//         const dispatchData = categories.map(cat => data[cat].dispatch);
+//         const deliverData = categories.map(cat => data[cat].deliver);
+
+//         // Calculate totals for additional info
+//         const totalDispatched = dispatchData.reduce((sum, val) => sum + val, 0);
+//         const totalDelivered = deliverData.reduce((sum, val) => sum + val, 0);
+
+//         const response = {
+//             success: true,
+//             title: view.charAt(0).toUpperCase() + view.slice(1),
+//             labels: categories,
+//             datasets: [
+//                 {
+//                     label: 'Dispatch',
+//                     data: dispatchData,
+//                     backgroundColor: '#ADD8E6',
+//                     borderColor: '#87CEEB',
+//                     borderWidth: 1
+//                 },
+//                 {
+//                     label: 'Deliver',
+//                     data: deliverData,
+//                     backgroundColor: '#FFC0CB',
+//                     borderColor: '#FFB6C1',
+//                     borderWidth: 1
+//                 }
+//             ],
+//             summary: {
+//                 totalDispatched,
+//                 totalDelivered,
+//                 totalOrders: totalDispatched + totalDelivered,
+//                 period: view === 'yearly' ? `Year ${year}` : 
+//                         view === 'monthly' ? `${month}/${year}` :
+//                         `Week of ${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}, ${year}`
+//             }
+//         };
+
+//         console.log('Response Summary:', response.summary); // Debug
+//         res.status(200).json(response);
+
+//     } catch (error) {
+//         console.error('Database or processing error:', error);
+//         return res.status(500).json({ 
+//             success: false, 
+//             message: 'Internal server error while fetching data.' 
+//         });
+//     }
+// });
+
+
+// Testing api
+// exports.dispatchData = TryCatch(async (req, res) => {
+
+//     const { view, year, month } = req.query;
+
+//     // Input validation
+//     if (!view || !['yearly', 'monthly'].includes(view)) {
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Invalid view. Use yearly or monthly.' 
+//         });
+//     }
+
+//     // Year validation
+//     if (!year || isNaN(year)) {
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Valid year is required.' 
+//         });
+//     }
+
+//     const yearNum = parseInt(year);
+//     const currentYear = new Date().getFullYear();
+    
+//     if (yearNum < 2000 || yearNum > currentYear + 1) {
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Year should be between 2000 and ' + (currentYear + 1) 
+//         });
+//     }
+
+//     let startDate, endDate;
+
+//     try {
+//         // Set date range based on view
+//         switch (view) {
+//             case 'yearly':
+//                 startDate = new Date(yearNum, 0, 1, 0, 0, 0, 0);                  
+//                 endDate = new Date(yearNum, 11, 31, 23, 59, 59, 999);            
+//                 break;
+
+//             case 'monthly':
+//                 if (!month) {
+//                     return res.status(400).json({ 
+//                         success: false, 
+//                         message: 'Month is required for monthly view.' 
+//                     });
+//                 }
+
+//                 // Improved month parsing
+//                 let monthIndex;
+//                 if (isNaN(month)) {
+//                     const monthNames = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 
+//                                        'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+//                     const monthStr = month.toLowerCase().substring(0, 3);
+//                     monthIndex = monthNames.indexOf(monthStr);
+                    
+//                     if (monthIndex === -1) {
+//                         return res.status(400).json({ 
+//                             success: false, 
+//                             message: 'Invalid month format. Use month name or number (1-12).' 
+//                         });
+//                     }
+//                 } else {
+//                     monthIndex = parseInt(month) - 1;
+//                     if (monthIndex < 0 || monthIndex > 11) {
+//                         return res.status(400).json({ 
+//                             success: false, 
+//                             message: 'Month should be between 1-12.' 
+//                         });
+//                     }
+//                 }
+
+//                 startDate = new Date(yearNum, monthIndex, 1, 0, 0, 0, 0);        
+//                 endDate = new Date(yearNum, monthIndex + 1, 0, 23, 59, 59, 999); 
+//                 break;
+//         }
+
+//         // Validate dates
+//         if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+//             throw new Error('Invalid date created');
+//         }
+
+//     } catch (error) {
+//         console.error('Date creation error:', error);
+//         return res.status(400).json({ 
+//             success: false, 
+//             message: 'Invalid date parameters.' 
+//         });
+//     }
+
+//     try {
+//         // Fetch and aggregate data
+//         const totalData = await DispatchModel.find({
+//             createdAt: { $gte: startDate, $lte: endDate }
+//         });
+
+//         console.log('Total Data Count:', totalData.length); // Debug: Check data count
+//         console.log('Date Range:', { startDate, endDate }); // Debug: Check date range
+
+//         let categories, data = {};
+
+//         switch (view) {
+//             case 'yearly':
+//                 categories = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+//                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                
+//                 totalData.forEach(item => {
+//                     if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+//                         console.warn('Invalid createdAt date:', item.createdAt);
+//                         return;
+//                     }
+                    
+//                     const month = new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short' });
+//                     const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+//                     console.log('Processing - Month:', month, 'Status:', status); // Debug
+                    
+//                     if (!data[month]) {
+//                         data[month] = { dispatch: 0, deliver: 0 };
+//                     }
+                    
+//                     if (status === 'dispatch') {
+//                         data[month].dispatch++;
+//                     } else if (status === 'delivered') {
+//                         data[month].deliver++;
+//                     }
+//                 });
+//                 break;
+
+//             case 'monthly':
+//                 const numDays = endDate.getDate();
+//                 categories = Array.from({ length: numDays }, (_, i) => String(i + 1));
+                
+//                 totalData.forEach(item => {
+//                     if (!item.createdAt || isNaN(new Date(item.createdAt).getTime())) {
+//                         console.warn('Invalid createdAt date:', item.createdAt);
+//                         return;
+//                     }
+                    
+//                     const day = new Date(item.createdAt).getDate().toString();
+//                     const status = item.dispatch_status?.toLowerCase()?.trim();
+                    
+//                     console.log('Processing - Day:', day, 'Status:', status); // Debug
+                    
+//                     if (!data[day]) {
+//                         data[day] = { dispatch: 0, deliver: 0 };
+//                     }
+                    
+//                     if (status === 'dispatch') {
+//                         data[day].dispatch++;
+//                     } else if (status === 'delivered') {
+//                         data[day].deliver++;
+//                     }
+//                 });
+//                 break;
+//         }
+
+//         // Fill missing categories with zero
+//         categories.forEach(cat => {
+//             if (!data[cat]) {
+//                 data[cat] = { dispatch: 0, deliver: 0 };
+//             }
+//         });
+
+//         // Build response arrays
+//         const dispatchData = categories.map(cat => data[cat].dispatch);
+//         const deliverData = categories.map(cat => data[cat].deliver);
+
+//         // Calculate totals for additional info
+//         const totalDispatched = dispatchData.reduce((sum, val) => sum + val, 0);
+//         const totalDelivered = deliverData.reduce((sum, val) => sum + val, 0);
+
+//         const response = {
+//             success: true,
+//             title: view.charAt(0).toUpperCase() + view.slice(1),
+//             labels: categories,
+//             datasets: [
+//                 {
+//                     label: 'Dispatch',
+//                     data: dispatchData,
+//                     backgroundColor: '#ADD8E6',
+//                     borderColor: '#87CEEB',
+//                     borderWidth: 1
+//                 },
+//                 {
+//                     label: 'Deliver',
+//                     data: deliverData,
+//                     backgroundColor: '#FFC0CB',
+//                     borderColor: '#FFB6C1',
+//                     borderWidth: 1
+//                 }
+//             ],
+//             summary: {
+//                 totalDispatched,
+//                 totalDelivered,
+//                 totalOrders: totalDispatched + totalDelivered,
+//                 period: view === 'yearly' ? `Year ${year}` : `${month}/${year}`
+//             }
+//         };
+
+//         console.log('Response Summary:', response.summary); // Debug
+//         res.status(200).json(response);
+
+//     } catch (error) {
+//         console.error('Database or processing error:', error);
+//         return res.status(500).json({ 
+//             success: false, 
+//             message: 'Internal server error while fetching data.' 
+//         });
+//     }
+// });
