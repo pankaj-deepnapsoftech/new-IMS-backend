@@ -1,5 +1,5 @@
 const express = require('express');
-const { summary,salesData,dispatchData } = require('../controllers/dashboard');
+const { summary,salesData,dispatchData,financialSummary } = require('../controllers/dashboard');
 const { isAuthenticated } = require('../middlewares/isAuthenticated');
 const { isSuper } = require('../middlewares/isSuper');
 const router = express.Router();
@@ -7,6 +7,8 @@ const router = express.Router();
 
 router.get('/sales', isAuthenticated, isSuper,salesData);
 router.get('/dispatch', isAuthenticated, isSuper,dispatchData);
+router.get('/finance', isAuthenticated, isSuper,financialSummary);
+
 
 router.post('/', isAuthenticated, isSuper, summary);
 
