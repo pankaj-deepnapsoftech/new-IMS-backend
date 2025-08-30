@@ -14,6 +14,7 @@ const BOMScrapMaterial = require("../models/bom-scrap-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
 const { Purchase } = require("../models/purchase");
 const {DispatchModel}  = require('../models/Dispatcher')
+const { PartiesModels } = require("../models/Parties");
 exports.summary = TryCatch(async (req, res) => {
   // Here we have to send the view also
   let { from, to } = req.body;
@@ -440,6 +441,155 @@ exports.summary = TryCatch(async (req, res) => {
     .toDate();
   const todayProduct = moment().endOf("day").toDate();
 
+
+
+
+
+   // ================= Production Chart Summary =================
+
+   let { filter } = req.query; // frontend can send ?filter=weekly|monthly|yearly
+
+   let startDate;
+   if (filter === "weekly") {
+     startDate = moment().subtract(7, "days").startOf("day").toDate();
+   } else if (filter === "monthly") {
+     startDate = moment().subtract(30, "days").startOf("day").toDate();
+   } else if (filter === "yearly") {
+     startDate = moment().subtract(1, "year").startOf("day").toDate();
+   }
+ 
+   const matchCondition = {};
+   if (startDate) {
+     matchCondition.createdAt = { $gte: startDate, $lte: new Date() };
+   }
+ 
+   // Pre-production statuses
+   const preProductionStatuses = [
+     "raw material approval pending",
+     "Inventory Allocated",
+     "request for allow inventory",
+     "inventory in transit",
+   ];
+ 
+   const productionChart = await ProductionProcess.aggregate([
+     { $match: matchCondition },
+     {
+       $group: {
+         _id: null,
+         completed: {
+           $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+         },
+         progress: {
+           $sum: {
+             $cond: [{ $eq: ["$status", "production in progress"] }, 1, 0],
+           },
+         },
+         pre_production: {
+           $sum: {
+             $cond: [{ $in: ["$status", preProductionStatuses] }, 1, 0],
+           },
+         },
+       },
+     },
+   ]);
+ 
+   const chartData =
+     productionChart.length > 0
+       ? productionChart[0]
+       : { completed: 0, progress: 0, pre_production: 0 };
+ 
+   // ================= Merchant Chart Summary =================
+   const merchantMatch = {};
+   if (startDate) {
+     merchantMatch.createdAt = { $gte: startDate, $lte: new Date() };
+   }
+ 
+   const [indBuyer, indSeller, compBuyer, compSeller, totalInd, totalComp] =
+     await Promise.all([
+       PartiesModels.countDocuments({
+         ...merchantMatch,
+         type: "Individual",
+         parties_type: "Buyer",
+       }),
+       PartiesModels.countDocuments({
+         ...merchantMatch,
+         type: "Individual",
+         parties_type: "Seller",
+       }),
+       PartiesModels.countDocuments({
+         ...merchantMatch,
+         type: "Company",
+         parties_type: "Buyer",
+       }),
+       PartiesModels.countDocuments({
+         ...merchantMatch,
+         type: "Company",
+         parties_type: "Seller",
+       }),
+       PartiesModels.countDocuments({ ...merchantMatch, type: "Individual" }),
+       PartiesModels.countDocuments({ ...merchantMatch, type: "Company" }),
+     ]);
+ 
+   const merchantChart = {
+     individual: {
+       buyer: indBuyer,
+       seller: indSeller,
+     },
+     company: {
+       buyer: compBuyer,
+       seller: compSeller,
+     },
+     totals: {
+       total_individual: totalInd,
+       total_company: totalComp,
+       total_merchant: totalInd+totalComp,
+     },
+   };
+ 
+   // ================= Inventory Chart Summary =================
+   const productMatch = {};
+   if (startDate) {
+     productMatch.createdAt = { $gte: startDate, $lte: new Date() };
+   }
+ 
+   // Raw Materials
+   const rawMaterialsCount = await Product.countDocuments({
+     ...productMatch,
+     category: "raw materials",
+   });
+ 
+   // Finished Goods
+   const finishedGoodsCount = await Product.countDocuments({
+     ...productMatch,
+     category: "finished goods",
+   });
+ 
+   // Indirect Inventory
+   const indirectInventoryCount = await Product.countDocuments({
+     ...productMatch,
+     inventory_category: "indirect",
+   });
+ 
+   // Work in Progress (from ProductionProcess)
+   const workInProgressCount = await ProductionProcess.countDocuments({
+     ...matchCondition,
+     status: "production started",
+   });
+ 
+   const inventoryChart = {
+     raw_materials: rawMaterialsCount,
+     finished_goods: finishedGoodsCount,
+     indirect_inventory: indirectInventoryCount,
+     work_in_progress: workInProgressCount,
+   };
+
+
+
+
+
+
+
+
   const productBuyTotalAgg = await Product.aggregate([
     {
       $match: {
@@ -494,6 +644,15 @@ exports.summary = TryCatch(async (req, res) => {
     invoice_summary: {
       total_invoice_amount_last_month: invoiceTotalLastMonth,
     },
+
+
+    production_chart: chartData, //for production data
+    inventory_chart: inventoryChart, //for inventory data
+    merchant_chart: merchantChart,  // for merchant data 
+
+
+
+
 
     invoices: totalInvoices,
     payments: totalPayments,
@@ -861,7 +1020,7 @@ exports.salesData = TryCatch(async (req, res) => {
       label: `${startOfCurrentMonth.toLocaleString("default", { month: "short" })} ${year}`,
       data: currData,
     },
-  ];
+  ];  
 
   break;
 }
