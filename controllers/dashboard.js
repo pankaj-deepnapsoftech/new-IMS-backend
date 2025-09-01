@@ -1588,3 +1588,118 @@ exports.financialSummary = TryCatch(async (req, res) => {
       }),
   });
 });
+
+
+// http://localhost:8085/api/dashboard/sales-delivered
+// It gives the status of Monthly Sales and Completed Order
+exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
+  // Step 1: Get current date and normalize to start of the day in UTC
+  const currentDate = new Date();
+  currentDate.setUTCHours(0, 0, 0, 0); // Normalize to start of the day in UTC
+  const currentMonth = currentDate.getMonth() + 1; // 1-12
+  const currentYear = currentDate.getFullYear();
+  const currentDay = currentDate.getDate();
+
+  console.log({ currentMonth, currentYear, currentDay }); // Debug
+
+  // Step 2: Calculate previous month
+  const prevMonth = currentMonth - 1 > 0 ? currentMonth - 1 : 12;
+  const prevYear = currentMonth - 1 > 0 ? currentYear : currentYear - 1;
+
+  // Step 3: Set date ranges for current and previous month
+  const currStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
+  const currEnd = new Date(Date.UTC(currentYear, currentMonth - 1, currentDay + 1)); // Up to today
+
+  const prevStart = new Date(Date.UTC(prevYear, prevMonth - 1, 1));
+  const prevEnd = new Date(Date.UTC(prevYear, prevMonth, 1)); // Full previous month
+
+  // Step 4: Aggregate sales for current month (1st to current date)
+  const currSales = await Purchase.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: currStart, $lt: currEnd },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Step 5: Aggregate sales for previous month (full month)
+  const prevSales = await Purchase.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: prevStart, $lt: prevEnd },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Step 6: Aggregate delivered count for current month (1st to current date)
+  const currDelivered = await DispatchModel.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: currStart, $lt: currEnd },
+        dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Step 7: Aggregate delivered count for previous month (full month)
+  const prevDelivered = await DispatchModel.aggregate([
+    {
+      $match: {
+        createdAt: { $gte: prevStart, $lt: prevEnd },
+        dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        total: { $sum: 1 },
+      },
+    },
+  ]);
+
+  // Step 8: Extract total sales and delivered counts
+  const currentMonthSales = currSales.length > 0 ? currSales[0].total : 0;
+  const previousMonthSales = prevSales.length > 0 ? prevSales[0].total : 0;
+  const differenceInSales = currentMonthSales - previousMonthSales;
+
+  const currentMonthDelivered = currDelivered.length > 0 ? currDelivered[0].total : 0;
+  const previousMonthDelivered = prevDelivered.length > 0 ? prevDelivered[0].total : 0;
+  const differenceInDelivered = currentMonthDelivered - previousMonthDelivered;
+
+  // Step 9: Send unified response
+  res.status(200).json({
+    success: true,
+    sales: {
+      currentMonthSales,
+      previousMonthSales,
+      differenceInSales,
+    },
+    delivered: {
+      currentMonthDelivered,
+      previousMonthDelivered,
+      differenceInDelivered,
+    },
+    period: {
+      currentMonth: `${currentMonth}/${currentYear}`,
+      previousMonth: `${prevMonth}/${prevYear}`,
+    },
+  });
+});
