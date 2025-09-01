@@ -2,12 +2,14 @@ const express = require('express');
 const { summary,salesData,dispatchData,financialSummary,dashboardWithFilter } = require('../controllers/dashboard');
 const { isAuthenticated } = require('../middlewares/isAuthenticated');
 const { isSuper } = require('../middlewares/isSuper');
+const { getStats } = require('../controllers/stats');
 const router = express.Router();
 
 
 router.get('/sales', isAuthenticated, isSuper,salesData);
 router.get('/dispatch', isAuthenticated, isSuper,dispatchData);
 router.get('/finance', isAuthenticated, isSuper,financialSummary);
+router.get("/stats", isAuthenticated, getStats);
 
 // New GET route for filtered dashboard data
 router.get('/', isAuthenticated, isSuper, dashboardWithFilter);
