@@ -1,5 +1,5 @@
 const express = require('express');
-const { summary,salesData,dispatchData,financialSummary, dashboardWithFilter, getMonthlySalesAndDelivered } = require('../controllers/dashboard');
+const { summary,salesData,dispatchData,financialSummary, dashboardWithFilter, getMonthlySalesAndDelivered,machineStatus } = require('../controllers/dashboard');
 const { isAuthenticated } = require('../middlewares/isAuthenticated');
 const { isSuper } = require('../middlewares/isSuper');
 const { getStats } = require('../controllers/stats');
@@ -11,6 +11,7 @@ router.get('/dispatch', isAuthenticated, isSuper,dispatchData);
 router.get('/finance', isAuthenticated, isSuper,financialSummary);
 router.get('/sales-delivered', isAuthenticated, isSuper,getMonthlySalesAndDelivered);
 router.get("/stats", isAuthenticated, getStats);
+router.get('/machine-status',machineStatus)
 router.get('/', isAuthenticated, isSuper, dashboardWithFilter);
 
 

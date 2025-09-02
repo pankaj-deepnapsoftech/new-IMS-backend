@@ -1,7 +1,9 @@
+const axios = require('axios');
 const moment = require("moment");
 const User = require("../models/user");
 const Agent = require("../models/agent");
 const BOM = require("../models/bom");
+const MachineStatus = require('../models/machineStatus')
 const BOMFinishedMaterial = require("../models/bom-finished-material");
 const Product = require("../models/product");
 const Store = require("../models/store");
@@ -2086,5 +2088,62 @@ exports.dashboardWithFilter = TryCatch(async (req, res) => {
     },
     inventory_chart: inventoryChart,
     merchant_chart: merchantChart,
+  });
+});
+
+
+
+// Machine Status data
+exports.machineStatus = TryCatch(async (req, res) => {
+  const apiResponse = await axios.get('http://192.168.1.35:5000/read'); 
+  const externalData = apiResponse.data;
+
+  // ✅ Check if API returned an empty array
+  if (!Array.isArray(externalData) || externalData.length === 0) {
+    return res.status(200).json({
+      success: true,
+      message: 'No data received from external API',
+      data: []
+    });
+  }
+
+  // ✅ Get last item from API response
+  const latest = externalData[externalData.length - 1];
+
+  // ✅ Check if machine already exists
+  const existingMachine = await MachineStatus.findOne({ machine: latest.machine });
+
+  let savedData;
+
+  if (existingMachine) {
+    // ✅ Update existing entry
+    existingMachine.status = latest.status;
+    existingMachine.timestamp = latest.timestamp;
+    existingMachine.value1 = latest.value1;
+    existingMachine.value2 = latest.value2;
+
+    savedData = await existingMachine.save();
+    console.log("✅ Updated existing machine:", savedData);
+  } else {
+    // ✅ Create new entry
+    const newEntry = new MachineStatus({
+      machine: latest.machine,
+      status: latest.status,
+      timestamp: latest.timestamp,
+      value1: latest.value1,
+      value2: latest.value2
+    });
+
+    savedData = await newEntry.save();
+    console.log("✅ Created new machine entry:", savedData);
+  }
+
+  // ✅ Optional: Return all data from DB
+  const allData = await MachineStatus.find({});
+
+  res.status(200).json({
+    success: true,
+    message: 'Data processed successfully',
+    data: allData
   });
 });
