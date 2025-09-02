@@ -2095,10 +2095,10 @@ exports.dashboardWithFilter = TryCatch(async (req, res) => {
 
 // Machine Status data
 exports.machineStatus = TryCatch(async (req, res) => {
-  const apiResponse = await axios.get('http://192.168.1.35:5000/read'); 
+  const apiResponse = await axios.get('http://192.168.1.35:5000/read');
   const externalData = apiResponse.data;
 
-  // ✅ Check if API returned an empty array
+  // ✅ 1. Handle empty data
   if (!Array.isArray(externalData) || externalData.length === 0) {
     return res.status(200).json({
       success: true,
@@ -2107,25 +2107,36 @@ exports.machineStatus = TryCatch(async (req, res) => {
     });
   }
 
-  // ✅ Get last item from API response
+  // ✅ 2. Get the latest machine data
   const latest = externalData[externalData.length - 1];
 
-  // ✅ Check if machine already exists
+  // ✅ 3. Check if machine already exists
   const existingMachine = await MachineStatus.findOne({ machine: latest.machine });
 
   let savedData;
 
   if (existingMachine) {
-    // ✅ Update existing entry
-    existingMachine.status = latest.status;
-    existingMachine.timestamp = latest.timestamp;
-    existingMachine.value1 = latest.value1;
-    existingMachine.value2 = latest.value2;
+    // ✅ 4. Skip update if no changes (⚠️ performance boost)
+    if (
+      existingMachine.status === latest.status &&
+      existingMachine.value1 === latest.value1 &&
+      existingMachine.value2 === latest.value2 &&
+      existingMachine.timestamp === latest.timestamp
+    ) {
+      console.log("ℹ️ No change detected, skipping DB update.");
+      savedData = existingMachine; // Still returning current data
+    } else {
+      // ✅ 5. Update only if data has changed
+      existingMachine.status = latest.status;
+      existingMachine.timestamp = latest.timestamp;
+      existingMachine.value1 = latest.value1;
+      existingMachine.value2 = latest.value2;
 
-    savedData = await existingMachine.save();
-    console.log("✅ Updated existing machine:", savedData);
+      savedData = await existingMachine.save();
+      console.log("✅ Updated existing machine:", savedData);
+    }
   } else {
-    // ✅ Create new entry
+    // ✅ 6. Create new entry if not exists
     const newEntry = new MachineStatus({
       machine: latest.machine,
       status: latest.status,
@@ -2138,7 +2149,7 @@ exports.machineStatus = TryCatch(async (req, res) => {
     console.log("✅ Created new machine entry:", savedData);
   }
 
-  // ✅ Optional: Return all data from DB
+  // ✅ 7. Optional: Return all machines
   const allData = await MachineStatus.find({});
 
   res.status(200).json({
