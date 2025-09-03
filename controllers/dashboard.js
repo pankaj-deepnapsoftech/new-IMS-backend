@@ -1,9 +1,10 @@
-const axios = require('axios');
+const axios = require("axios");
 const moment = require("moment");
 const User = require("../models/user");
 const Agent = require("../models/agent");
 const BOM = require("../models/bom");
-const MachineStatus = require('../models/machineStatus')
+const MachineStatus = require("../models/machineStatus");
+const MachineRegistry = require("../models/machineRegistrySchema");
 const BOMFinishedMaterial = require("../models/bom-finished-material");
 const Product = require("../models/product");
 const Store = require("../models/store");
@@ -15,7 +16,7 @@ const { TryCatch } = require("../utils/error");
 const BOMScrapMaterial = require("../models/bom-scrap-material");
 const BOMRawMaterial = require("../models/bom-raw-material");
 const { Purchase } = require("../models/purchase");
-const {DispatchModel}  = require('../models/Dispatcher')
+const { DispatchModel } = require("../models/Dispatcher");
 const { PartiesModels } = require("../models/Parties");
 exports.summary = TryCatch(async (req, res) => {
   // Here we have to send the view also
@@ -443,154 +444,143 @@ exports.summary = TryCatch(async (req, res) => {
     .toDate();
   const todayProduct = moment().endOf("day").toDate();
 
+  // ================= Production Chart Summary =================
 
+  let { filter } = req.query; // frontend can send ?filter=weekly|monthly|yearly
 
+  let startDate;
+  if (filter === "weekly") {
+    startDate = moment().subtract(7, "days").startOf("day").toDate();
+  } else if (filter === "monthly") {
+    startDate = moment().subtract(30, "days").startOf("day").toDate();
+  } else if (filter === "yearly") {
+    startDate = moment().subtract(1, "year").startOf("day").toDate();
+  }
 
+  const matchCondition = {};
+  if (startDate) {
+    matchCondition.createdAt = { $gte: startDate, $lte: new Date() };
+  }
 
-   // ================= Production Chart Summary =================
+  // Pre-production statuses
+  const preProductionStatuses = [
+    "raw material approval pending",
+    "Inventory Allocated",
+    "request for allow inventory",
+    "inventory in transit",
+  ];
 
-   let { filter } = req.query; // frontend can send ?filter=weekly|monthly|yearly
+  const productionChart = await ProductionProcess.aggregate([
+    { $match: matchCondition },
+    {
+      $group: {
+        _id: null,
+        completed: {
+          $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+        },
+        progress: {
+          $sum: {
+            $cond: [{ $eq: ["$status", "production in progress"] }, 1, 0],
+          },
+        },
+        pre_production: {
+          $sum: {
+            $cond: [{ $in: ["$status", preProductionStatuses] }, 1, 0],
+          },
+        },
+      },
+    },
+  ]);
 
-   let startDate;
-   if (filter === "weekly") {
-     startDate = moment().subtract(7, "days").startOf("day").toDate();
-   } else if (filter === "monthly") {
-     startDate = moment().subtract(30, "days").startOf("day").toDate();
-   } else if (filter === "yearly") {
-     startDate = moment().subtract(1, "year").startOf("day").toDate();
-   }
- 
-   const matchCondition = {};
-   if (startDate) {
-     matchCondition.createdAt = { $gte: startDate, $lte: new Date() };
-   }
- 
-   // Pre-production statuses
-   const preProductionStatuses = [
-     "raw material approval pending",
-     "Inventory Allocated",
-     "request for allow inventory",
-     "inventory in transit",
-   ];
- 
-   const productionChart = await ProductionProcess.aggregate([
-     { $match: matchCondition },
-     {
-       $group: {
-         _id: null,
-         completed: {
-           $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
-         },
-         progress: {
-           $sum: {
-             $cond: [{ $eq: ["$status", "production in progress"] }, 1, 0],
-           },
-         },
-         pre_production: {
-           $sum: {
-             $cond: [{ $in: ["$status", preProductionStatuses] }, 1, 0],
-           },
-         },
-       },
-     },
-   ]);
- 
-   const chartData =
-     productionChart.length > 0
-       ? productionChart[0]
-       : { completed: 0, progress: 0, pre_production: 0 };
- 
-   // ================= Merchant Chart Summary =================
-   const merchantMatch = {};
-   if (startDate) {
-     merchantMatch.createdAt = { $gte: startDate, $lte: new Date() };
-   }
- 
-   const [indBuyer, indSeller, compBuyer, compSeller, totalInd, totalComp] =
-     await Promise.all([
-       PartiesModels.countDocuments({
-         ...merchantMatch,
-         type: "Individual",
-         parties_type: "Buyer",
-       }),
-       PartiesModels.countDocuments({
-         ...merchantMatch,
-         type: "Individual",
-         parties_type: "Seller",
-       }),
-       PartiesModels.countDocuments({
-         ...merchantMatch,
-         type: "Company",
-         parties_type: "Buyer",
-       }),
-       PartiesModels.countDocuments({
-         ...merchantMatch,
-         type: "Company",
-         parties_type: "Seller",
-       }),
-       PartiesModels.countDocuments({ ...merchantMatch, type: "Individual" }),
-       PartiesModels.countDocuments({ ...merchantMatch, type: "Company" }),
-     ]);
- 
-   const merchantChart = {
-     individual: {
-       buyer: indBuyer,
-       seller: indSeller,
-     },
-     company: {
-       buyer: compBuyer,
-       seller: compSeller,
-     },
-     totals: {
-       total_individual: totalInd,
-       total_company: totalComp,
-       total_merchant: totalInd+totalComp,
-     },
-   };
- 
-   // ================= Inventory Chart Summary =================
-   const productMatch = {};
-   if (startDate) {
-     productMatch.createdAt = { $gte: startDate, $lte: new Date() };
-   }
- 
-   // Raw Materials
-   const rawMaterialsCount = await Product.countDocuments({
-     ...productMatch,
-     category: "raw materials",
-   });
- 
-   // Finished Goods
-   const finishedGoodsCount = await Product.countDocuments({
-     ...productMatch,
-     category: "finished goods",
-   });
- 
-   // Indirect Inventory
-   const indirectInventoryCount = await Product.countDocuments({
-     ...productMatch,
-     inventory_category: "indirect",
-   });
- 
-   // Work in Progress (from ProductionProcess)
-   const workInProgressCount = await ProductionProcess.countDocuments({
-     ...matchCondition,
-     status: "production started",
-   });
- 
-   const inventoryChart = {
-     raw_materials: rawMaterialsCount,
-     finished_goods: finishedGoodsCount,
-     indirect_inventory: indirectInventoryCount,
-     work_in_progress: workInProgressCount,
-   };
+  const chartData =
+    productionChart.length > 0
+      ? productionChart[0]
+      : { completed: 0, progress: 0, pre_production: 0 };
 
+  // ================= Merchant Chart Summary =================
+  const merchantMatch = {};
+  if (startDate) {
+    merchantMatch.createdAt = { $gte: startDate, $lte: new Date() };
+  }
 
+  const [indBuyer, indSeller, compBuyer, compSeller, totalInd, totalComp] =
+    await Promise.all([
+      PartiesModels.countDocuments({
+        ...merchantMatch,
+        type: "Individual",
+        parties_type: "Buyer",
+      }),
+      PartiesModels.countDocuments({
+        ...merchantMatch,
+        type: "Individual",
+        parties_type: "Seller",
+      }),
+      PartiesModels.countDocuments({
+        ...merchantMatch,
+        type: "Company",
+        parties_type: "Buyer",
+      }),
+      PartiesModels.countDocuments({
+        ...merchantMatch,
+        type: "Company",
+        parties_type: "Seller",
+      }),
+      PartiesModels.countDocuments({ ...merchantMatch, type: "Individual" }),
+      PartiesModels.countDocuments({ ...merchantMatch, type: "Company" }),
+    ]);
 
+  const merchantChart = {
+    individual: {
+      buyer: indBuyer,
+      seller: indSeller,
+    },
+    company: {
+      buyer: compBuyer,
+      seller: compSeller,
+    },
+    totals: {
+      total_individual: totalInd,
+      total_company: totalComp,
+      total_merchant: totalInd + totalComp,
+    },
+  };
 
+  // ================= Inventory Chart Summary =================
+  const productMatch = {};
+  if (startDate) {
+    productMatch.createdAt = { $gte: startDate, $lte: new Date() };
+  }
 
+  // Raw Materials
+  const rawMaterialsCount = await Product.countDocuments({
+    ...productMatch,
+    category: "raw materials",
+  });
 
+  // Finished Goods
+  const finishedGoodsCount = await Product.countDocuments({
+    ...productMatch,
+    category: "finished goods",
+  });
 
+  // Indirect Inventory
+  const indirectInventoryCount = await Product.countDocuments({
+    ...productMatch,
+    inventory_category: "indirect",
+  });
+
+  // Work in Progress (from ProductionProcess)
+  const workInProgressCount = await ProductionProcess.countDocuments({
+    ...matchCondition,
+    status: "production started",
+  });
+
+  const inventoryChart = {
+    raw_materials: rawMaterialsCount,
+    finished_goods: finishedGoodsCount,
+    indirect_inventory: indirectInventoryCount,
+    work_in_progress: workInProgressCount,
+  };
 
   const productBuyTotalAgg = await Product.aggregate([
     {
@@ -647,14 +637,9 @@ exports.summary = TryCatch(async (req, res) => {
       total_invoice_amount_last_month: invoiceTotalLastMonth,
     },
 
-
     production_chart: chartData, //for production data
     inventory_chart: inventoryChart, //for inventory data
-    merchant_chart: merchantChart,  // for merchant data 
-
-
-
-
+    merchant_chart: merchantChart, // for merchant data
 
     invoices: totalInvoices,
     payments: totalPayments,
@@ -880,8 +865,6 @@ exports.salesData = TryCatch(async (req, res) => {
 
       break;
     }
- 
-
 
     //  http://localhost:8085/api/dashboard/sales?view=weekly&month=aug
     case "weekly": {
@@ -1426,8 +1409,6 @@ exports.dispatchData = TryCatch(async (req, res) => {
   }
 });
 
-
-
 // ************************** NEW SEPARATE FUNCTION FOR FINANCIAL SUMMARY ****************
 
 // For year
@@ -1465,7 +1446,7 @@ exports.financialSummary = TryCatch(async (req, res) => {
     });
   } else if (view === "monthly" && year) {
     // If month is not provided, default to current month
-    const currentMonth = mon || (new Date().getMonth() + 1);
+    const currentMonth = mon || new Date().getMonth() + 1;
     let monthIndex;
 
     if (!isNaN(currentMonth)) {
@@ -1491,11 +1472,16 @@ exports.financialSummary = TryCatch(async (req, res) => {
       },
     };
 
-    console.log(`Monthly filter applied for: ${currentMonth} ${year}${!mon ? ' (defaulted to current month)' : ''}`, {
-      monthIndex,
-      startDate: moment(startDate).format("YYYY-MM-DD HH:mm:ss"),
-      endDate: moment(endDate).format("YYYY-MM-DD HH:mm:ss"),
-    });
+    console.log(
+      `Monthly filter applied for: ${currentMonth} ${year}${
+        !mon ? " (defaulted to current month)" : ""
+      }`,
+      {
+        monthIndex,
+        startDate: moment(startDate).format("YYYY-MM-DD HH:mm:ss"),
+        endDate: moment(endDate).format("YYYY-MM-DD HH:mm:ss"),
+      }
+    );
   } else if (view === "weekly") {
     // Weekly view - current day ke piche 6 days (total 7 days including today)
     endDate = moment().endOf("day").toDate();
@@ -1752,7 +1738,6 @@ exports.financialSummary = TryCatch(async (req, res) => {
   });
 });
 
-
 // http://localhost:8085/api/dashboard/sales-delivered
 // It gives the status of Monthly Sales and Completed Order
 exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
@@ -1771,7 +1756,9 @@ exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
 
   // Step 3: Set date ranges for current and previous month
   const currStart = new Date(Date.UTC(currentYear, currentMonth - 1, 1));
-  const currEnd = new Date(Date.UTC(currentYear, currentMonth - 1, currentDay + 1)); // Up to today
+  const currEnd = new Date(
+    Date.UTC(currentYear, currentMonth - 1, currentDay + 1)
+  ); // Up to today
 
   const prevStart = new Date(Date.UTC(prevYear, prevMonth - 1, 1));
   const prevEnd = new Date(Date.UTC(prevYear, prevMonth, 1)); // Full previous month
@@ -1843,8 +1830,10 @@ exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
   const previousMonthSales = prevSales.length > 0 ? prevSales[0].total : 0;
   const differenceInSales = currentMonthSales - previousMonthSales;
 
-  const currentMonthDelivered = currDelivered.length > 0 ? currDelivered[0].total : 0;
-  const previousMonthDelivered = prevDelivered.length > 0 ? prevDelivered[0].total : 0;
+  const currentMonthDelivered =
+    currDelivered.length > 0 ? currDelivered[0].total : 0;
+  const previousMonthDelivered =
+    prevDelivered.length > 0 ? prevDelivered[0].total : 0;
   const differenceInDelivered = currentMonthDelivered - previousMonthDelivered;
 
   // Step 9: Send unified response
@@ -1870,7 +1859,7 @@ exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
 // New GET endpoint for dashboard with filter parameter
 exports.dashboardWithFilter = TryCatch(async (req, res) => {
   const { filter } = req.query;
-  
+
   console.log("Dashboard filter request:", { filter });
 
   let dateCondition = {};
@@ -2077,9 +2066,12 @@ exports.dashboardWithFilter = TryCatch(async (req, res) => {
     message: `Dashboard data for ${filter || "all"} view`,
     filter_applied: {
       filter: filter || "none",
-      date_range: Object.keys(dateCondition).length > 0 
-        ? `${moment(startDate).format("YYYY-MM-DD")} to ${moment(endDate).format("YYYY-MM-DD")}`
-        : "No date filter",
+      date_range:
+        Object.keys(dateCondition).length > 0
+          ? `${moment(startDate).format("YYYY-MM-DD")} to ${moment(
+              endDate
+            ).format("YYYY-MM-DD")}`
+          : "No date filter",
     },
     production_chart: productionChart[0] || {
       completed: 0,
@@ -2092,69 +2084,120 @@ exports.dashboardWithFilter = TryCatch(async (req, res) => {
 });
 
 
+////--> New version of machine code
+// http://localhost:8085/api/dashboard/get-machine-list?device_id=LOOM1
+exports.getAllMachines = TryCatch(async (req, res) => {
+  const { device_id } = req.query;  // 🔄 machine → device_id
 
-// Machine Status data
-exports.machineStatus = TryCatch(async (req, res) => {
-  const apiResponse = await axios.get('http://192.168.1.35:5000/read');
-  const externalData = apiResponse.data;
-
-  // ✅ 1. Handle empty data
-  if (!Array.isArray(externalData) || externalData.length === 0) {
-    return res.status(200).json({
-      success: true,
-      message: 'No data received from external API',
-      data: []
+  // 🔒 Check if device_id is provided
+  if (!device_id) {
+    return res.status(400).json({
+      success: false,
+      message: "device_id is required in query",
     });
   }
 
-  // ✅ 2. Get the latest machine data
-  const latest = externalData[externalData.length - 1];
+  // 📦 Fetch all records for the device_id
+  const allRecords = await MachineStatus.find({ device_id });
 
-  // ✅ 3. Check if machine already exists
-  const existingMachine = await MachineStatus.findOne({ machine: latest.machine });
-
-  let savedData;
-
-  if (existingMachine) {
-    // ✅ 4. Skip update if no changes (⚠️ performance boost)
-    if (
-      existingMachine.status === latest.status &&
-      existingMachine.value1 === latest.value1 &&
-      existingMachine.value2 === latest.value2 &&
-      existingMachine.timestamp === latest.timestamp
-    ) {
-      console.log("ℹ️ No change detected, skipping DB update.");
-      savedData = existingMachine; // Still returning current data
-    } else {
-      // ✅ 5. Update only if data has changed
-      existingMachine.status = latest.status;
-      existingMachine.timestamp = latest.timestamp;
-      existingMachine.value1 = latest.value1;
-      existingMachine.value2 = latest.value2;
-
-      savedData = await existingMachine.save();
-      console.log("✅ Updated existing machine:", savedData);
-    }
-  } else {
-    // ✅ 6. Create new entry if not exists
-    const newEntry = new MachineStatus({
-      machine: latest.machine,
-      status: latest.status,
-      timestamp: latest.timestamp,
-      value1: latest.value1,
-      value2: latest.value2
-    });
-
-    savedData = await newEntry.save();
-    console.log("✅ Created new machine entry:", savedData);
-  }
-
-  // ✅ 7. Optional: Return all machines
-  const allData = await MachineStatus.find({});
+  // 🕐 Get the most recent one (by timestamp)
+  const latestRecord = await MachineStatus.findOne({ device_id }).sort({
+    timestamp: -1,
+  });
 
   res.status(200).json({
     success: true,
-    message: 'Data processed successfully',
-    data: allData
+    message: `Data for device_id: ${device_id}`,
+    latest: latestRecord,
+    history: allRecords,
+  });
+});
+
+
+// To save machiine data in database
+exports.machineStatus = TryCatch(async (req, res) => {
+
+  console.log("📡 Fetching device data");
+  // ✅ Axios call with timeout
+  let externalData = [];
+  try {
+    const apiResponse = await axios.get("http://192.168.1.35:5000/data", {
+      timeout: 5000
+    });
+    externalData = apiResponse.data;
+    console.log("📦 External data:", externalData);
+  } catch (error) {
+    console.error("❌ External API call failed:", error.message);
+    return res.status(503).json({
+      success: false,
+      message: "Failed to fetch data from external device server",
+      error: error.message
+    });
+  }
+
+  // ✅ 1. Check if data is empty
+  if (!Array.isArray(externalData) || externalData.length === 0) {
+    return res.status(200).json({
+      success: true,
+      message: "No data received from external API",
+      data: [],
+    });
+  }
+
+  // ✅ 2. Load or create device registry
+  let deviceRegistry = await MachineRegistry.findOne();
+  if (!deviceRegistry) {
+    deviceRegistry = new MachineRegistry({ devices: [] });
+  }
+
+  const existingDevices = new Set(deviceRegistry.devices);
+
+  // ✅ 3. Loop through and save all data
+  for (const item of externalData) {
+    const {
+      device_id,
+      count,
+      design,
+      efficiency,
+      error1,
+      error2,
+      shift,
+      timestamp
+    } = item;
+
+    // ✅ Check if record already exists by device_id + timestamp
+  const exists = await MachineStatus.findOne({ device_id, timestamp });
+  if (exists) {
+    console.log(`⚠️ Record for device_id: ${device_id} at timestamp: ${timestamp} already exists. Skipping save.`);
+    continue; // Skip this record, don't save again
+  }
+
+
+    // ✅ 3b. Save device data
+    const newDeviceData = new MachineStatus({
+      device_id,
+      count,
+      design,
+      efficiency,
+      error1,
+      error2,
+      shift,
+      timestamp
+    });
+
+    await newDeviceData.save();
+    console.log("✅ Saved device data:", device_id);
+  }
+
+  // ✅ 4. Save updated registry
+  deviceRegistry.devices = Array.from(existingDevices);
+  await deviceRegistry.save();
+  console.log("✅ Device registry updated");
+
+  // ✅ 5. Send response
+  res.status(200).json({
+    success: true,
+    message: "Device data saved and registry updated",
+    devices: deviceRegistry.devices,
   });
 });

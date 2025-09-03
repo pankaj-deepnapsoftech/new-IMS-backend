@@ -1,14 +1,17 @@
 const { Schema, model } = require("mongoose");
 
 const machineStatusSchema = new Schema({
-  machine: { type: String, required: true },
-  status: { type: String, required: true },
-  timestamp: { type: String, required: true },
-  value1: { type: Number, required: true },
-  value2: { type: Number, required: true }
+  device_id: { type: String, required: true },  // 🔄 Renamed from "machine"
+  count: { type: Number, required: true },
+  design: { type: String, required: true },
+  efficiency: { type: Number, required: true },
+  error1: { type: Number, required: true },
+  error2: { type: Number, required: true },
+  shift: { type: String, required: true },
+  timestamp: { type: String, required: true }
 }, {
-  timestamps: true // createdAt aur updatedAt auto add ho jayega
+  timestamps: true
 });
 
-const MachineStatus =  model('MachineStatus', machineStatusSchema);
+const MachineStatus = model('MachineStatus', machineStatusSchema);
 module.exports = MachineStatus;
