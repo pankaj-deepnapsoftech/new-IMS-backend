@@ -17,6 +17,42 @@ const BOMRawMaterial = require("../models/bom-raw-material");
 const { Purchase } = require("../models/purchase");
 const {DispatchModel}  = require('../models/Dispatcher')
 const { PartiesModels } = require("../models/Parties");
+
+exports.getWelcomeMessage = async (req, res) => {
+  try {
+    const now = new Date();
+    const hour = now.getHours();
+
+    let greeting;
+    if (hour < 12) {
+      greeting = "Good Morning";
+    } else if (hour < 18) {
+      greeting = "Good Afternoon";
+    } else {
+      greeting = "Good Evening";
+    }
+
+    // Format date like Wednesday, 20 August 2025
+    const options = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
+    const formattedDate = now.toLocaleDateString("en-GB", options);
+
+    res.status(200).json({
+      status: 200,
+      success: true,
+      welcome: `${greeting}, Today is ${formattedDate}`,
+      greeting,
+      date: formattedDate
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 500,
+      success: false,
+      message: "Error generating welcome message",
+      error: error.message
+    });
+  }
+};
+
 exports.summary = TryCatch(async (req, res) => {
   // Here we have to send the view also
   let { from, to } = req.body;
