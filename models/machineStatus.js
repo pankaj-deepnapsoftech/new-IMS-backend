@@ -7,6 +7,7 @@ const machineStatusSchema = new Schema({
   efficiency: { type: Number, required: true },
   error1: { type: Number, required: true },
   error2: { type: Number, required: true },
+  status: {type: String, required: true},
   shift: { type: String, required: true },
   timestamp: { type: String, required: true }
 }, {
