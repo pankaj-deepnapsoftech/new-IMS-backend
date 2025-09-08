@@ -2917,21 +2917,48 @@ exports.debugMachineData = TryCatch(async (req, res) => {
 });
 
 
-//-----------This is an API for Pre-production and progress ------------------
-exports.productionChart = TryCatch(async (req, res) => {
-  // Get current date and first day of current month
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+///api for production dashboard
+exports.getProductionDashboard = TryCatch(async (req, res) => {
+  const now = moment();
 
-  // Define match condition for current month
-  const matchCondition = {
-    createdAt: {
-      $gte: firstDayOfMonth,
-      $lte: now,
+  // ==== Calculate date ranges ====
+  const startOfThisMonth = now.clone().startOf("month").toDate();
+  const endOfThisMonth = now.clone().endOf("month").toDate();
+
+  const startOfLastMonth = now
+    .clone()
+    .subtract(1, "month")
+    .startOf("month")
+    .toDate();
+  const endOfLastMonth = now
+    .clone()
+    .subtract(1, "month")
+    .endOf("month")
+    .toDate();
+
+  // ==== BOM Counts ====
+  const totalBOM = await BOM.countDocuments();
+  const lastMonthBOM = await BOM.countDocuments({
+    createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+  });
+  const thisMonthBOM = await BOM.countDocuments({
+    createdAt: { $gte: startOfThisMonth, $lte: endOfThisMonth },
+  });
+
+  // ==== Total Production Completed (All Time) ====
+  const productionCompletedAllTime = await ProductionProcess.aggregate([
+    { $match: {} },
+    {
+      $group: {
+        _id: null,
+        completed: {
+          $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+        },
+      },
     },
-  };
+  ]);
 
-  // Define pre-production statuses
+  // ==== Production Chart (Current Month Only) ====
   const preProductionStatuses = [
     "raw material approval pending",
     "Inventory Allocated",
@@ -2939,9 +2966,15 @@ exports.productionChart = TryCatch(async (req, res) => {
     "inventory in transit",
   ];
 
-  // Run aggregation
-  const productionChart = await ProductionProcess.aggregate([
-    { $match: matchCondition },
+  const productionChartThisMonth = await ProductionProcess.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: startOfThisMonth,
+          $lte: endOfThisMonth,
+        },
+      },
+    },
     {
       $group: {
         _id: null,
@@ -2962,12 +2995,23 @@ exports.productionChart = TryCatch(async (req, res) => {
     },
   ]);
 
-  // Prepare response
+  // ==== Prepare Response ====
   const chartData =
-    productionChart.length > 0
-      ? productionChart[0]
+    productionChartThisMonth.length > 0
+      ? productionChartThisMonth[0]
       : { completed: 0, progress: 0, pre_production: 0 };
 
-  // Send response
-  res.status(200).json({ success: true, data: chartData });
+  return res.status(200).json({
+    success: true,
+    bom: {
+      total: totalBOM,
+      lastMonth: lastMonthBOM,
+      thisMonth: thisMonthBOM,
+    },
+    total_production_completed:
+      productionCompletedAllTime.length > 0
+        ? productionCompletedAllTime[0].completed
+        : 0,
+    production_chart: chartData, // 👈 Added chart data from current month
+  });
 });
