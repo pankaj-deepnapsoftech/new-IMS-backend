@@ -12,6 +12,7 @@ router.get('/dispatch', isAuthenticated, isSuper,dispatchData);
 router.get('/finance', isAuthenticated, isSuper,financialSummary);
 router.get('/sales-delivered', isAuthenticated, isSuper,getMonthlySalesAndDelivered);
 router.get("/stats", isAuthenticated, getStats);
+router.get("/Production-dashboard", isAuthenticated, getProductionDashboard);
 router.get('/get-data-from-machine',machineStatus);
 router.get('/production-chart',productionChart);
 

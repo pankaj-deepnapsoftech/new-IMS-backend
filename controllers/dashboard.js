@@ -34,7 +34,12 @@ exports.getWelcomeMessage = async (req, res) => {
     }
 
     // Format date like Wednesday, 20 August 2025
-    const options = { weekday: "long", day: "numeric", month: "long", year: "numeric" };
+    const options = {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    };
     const formattedDate = now.toLocaleDateString("en-GB", options);
 
     res.status(200).json({
@@ -42,14 +47,14 @@ exports.getWelcomeMessage = async (req, res) => {
       success: true,
       welcome: `${greeting}, Today is ${formattedDate}`,
       greeting,
-      date: formattedDate
+      date: formattedDate,
     });
   } catch (error) {
     res.status(500).json({
       status: 500,
       success: false,
       message: "Error generating welcome message",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -690,7 +695,7 @@ exports.summary = TryCatch(async (req, res) => {
   });
 });
 
-exports.salesData = TryCatch(async (req, res) => {
+exports.  salesData = TryCatch(async (req, res) => {
   const view = req.query.view || "yearly"; // Default yearly
   const currentYear = new Date().getFullYear();
   const prevYear = currentYear - 1;
@@ -1834,7 +1839,8 @@ exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: currStart, $lt: currEnd },
-        dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        // dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        $expr: { $eq: ["$quantity", "$dispatch_qty"] },
       },
     },
     {
@@ -1850,7 +1856,8 @@ exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: prevStart, $lt: prevEnd },
-        dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        // dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        $expr: { $eq: ["$quantity", "$dispatch_qty"] },
       },
     },
     {
@@ -2119,7 +2126,6 @@ exports.dashboardWithFilter = TryCatch(async (req, res) => {
   });
 });
 
-
 ////--> New version of machine code
 // http://localhost:8085/api/dashboard/get-machine-list?device_id=LOOM1
 // exports.getAllMachines = TryCatch(async (req, res) => {
@@ -2148,7 +2154,6 @@ exports.dashboardWithFilter = TryCatch(async (req, res) => {
 //     history: allRecords,
 //   });
 // });
-
 
 // This is the api which will take data from machine server and push the data in database
 // To save machine data in database
@@ -2192,7 +2197,7 @@ exports.machineStatus = TryCatch(async (req, res) => {
   const deviceIds = new Set();
   const designs = new Set();
   const statuses = new Set();
-  
+
   // Step 1: Validate and prepare data
   for (const item of externalData) {
     const {
@@ -2209,7 +2214,9 @@ exports.machineStatus = TryCatch(async (req, res) => {
 
     // Validate required fields
     if (!device_id || !status) {
-      console.error(`❌ Missing required fields for item: ${JSON.stringify(item)}`);
+      console.error(
+        `❌ Missing required fields for item: ${JSON.stringify(item)}`
+      );
       continue; // Skip this item if required fields are missing
     }
 
@@ -2234,19 +2241,19 @@ exports.machineStatus = TryCatch(async (req, res) => {
   const existingRecords = await MachineStatus.find({
     device_id: { $in: Array.from(deviceIds) },
     design: { $in: Array.from(designs) },
-    status: { $in: Array.from(statuses) }
+    status: { $in: Array.from(statuses) },
   });
 
   // Step 3: Create lookup map for faster access
   const existingMap = new Map();
-  existingRecords.forEach(record => {
+  existingRecords.forEach((record) => {
     const key = `${record.device_id}_${record.design}_${record.status}`;
     existingMap.set(key, record);
   });
 
   // Step 4: Prepare bulk operations
   const bulkOperations = [];
-  const currentDate = new Date().toISOString().split('T')[0]; // e.g., "2025-09-04"
+  const currentDate = new Date().toISOString().split("T")[0]; // e.g., "2025-09-04"
 
   for (const item of validItems) {
     const {
@@ -2261,7 +2268,7 @@ exports.machineStatus = TryCatch(async (req, res) => {
       timestamp,
     } = item;
 
-    const itemDate = moment(timestamp).toISOString().split('T')[0]; // Extract date from timestamp
+    const itemDate = moment(timestamp).toISOString().split("T")[0]; // Extract date from timestamp
     const key = `${device_id}_${design}_${status}`;
     const existing = existingMap.get(key);
 
@@ -2290,10 +2297,12 @@ exports.machineStatus = TryCatch(async (req, res) => {
                   shift,
                   status,
                   timestamp,
-                }
-              }
+                },
+              },
             });
-            console.log(`✅ New record queued for ${device_id} at ${timestamp} with design ${design} due to different shift`);
+            console.log(
+              `✅ New record queued for ${device_id} at ${timestamp} with design ${design} due to different shift`
+            );
           } else {
             // 🔁 Update only changed fields if shift is same
             bulkOperations.push({
@@ -2306,14 +2315,18 @@ exports.machineStatus = TryCatch(async (req, res) => {
                     error1,
                     error2,
                     timestamp,
-                  }
-                }
-              }
+                  },
+                },
+              },
             });
-            console.log(`🔁 Update queued for ${device_id} at ${timestamp} with design ${design}`);
+            console.log(
+              `🔁 Update queued for ${device_id} at ${timestamp} with design ${design}`
+            );
           }
         } else {
-          console.log(`⚠️ No change for ${device_id} around ${timestamp} with design ${design}, skipping.`);
+          console.log(
+            `⚠️ No change for ${device_id} around ${timestamp} with design ${design}, skipping.`
+          );
         }
       } else {
         // 🆕 Save new document if date is different (e.g., new day)
@@ -2329,10 +2342,12 @@ exports.machineStatus = TryCatch(async (req, res) => {
               shift,
               status,
               timestamp,
-            }
-          }
+            },
+          },
         });
-        console.log(`✅ New record queued for ${device_id} at ${timestamp} with design ${design} due to new date`);
+        console.log(
+          `✅ New record queued for ${device_id} at ${timestamp} with design ${design} due to new date`
+        );
       }
     } else {
       // 🆕 Save new record if no existing record found
@@ -2348,10 +2363,12 @@ exports.machineStatus = TryCatch(async (req, res) => {
             shift,
             status,
             timestamp,
-          }
-        }
+          },
+        },
       });
-      console.log(`✅ New record queued for ${device_id} at ${timestamp} with design ${design}`);
+      console.log(
+        `✅ New record queued for ${device_id} at ${timestamp} with design ${design}`
+      );
     }
 
     // Add device to registry if not already present
@@ -2364,7 +2381,9 @@ exports.machineStatus = TryCatch(async (req, res) => {
   if (bulkOperations.length > 0) {
     try {
       const result = await MachineStatus.bulkWrite(bulkOperations);
-      console.log(`✅ Bulk operations completed: ${result.insertedCount} inserted, ${result.modifiedCount} updated`);
+      console.log(
+        `✅ Bulk operations completed: ${result.insertedCount} inserted, ${result.modifiedCount} updated`
+      );
     } catch (error) {
       console.error("❌ Bulk operations failed:", error);
       // Fallback to individual operations if bulk fails
@@ -2375,7 +2394,10 @@ exports.machineStatus = TryCatch(async (req, res) => {
             const newRecord = new MachineStatus(operation.insertOne.document);
             await newRecord.save();
           } else if (operation.updateOne) {
-            await MachineStatus.updateOne(operation.updateOne.filter, operation.updateOne.update);
+            await MachineStatus.updateOne(
+              operation.updateOne.filter,
+              operation.updateOne.update
+            );
           }
         } catch (individualError) {
           console.error("❌ Individual operation failed:", individualError);
@@ -2397,7 +2419,6 @@ exports.machineStatus = TryCatch(async (req, res) => {
   });
 });
 
-
 // this is the api which will show the results in the dashboard
 //It has 5 parts
 // http://localhost:8085/api/dashboard/machine-data?date=2025-09-04   //for date query
@@ -2407,10 +2428,10 @@ http://localhost:8085/api/dashboard/machine-data?design=Design123   // for Desig
 
 // http://localhost:5000/api/dashboard/machine-data?start_date=2025-09-01&end_date=2025-09-07 // for date range, when start_date and end_dte is given
 // Unified API for machine data - handles device_id, design, and date queries
-// 
+//
 exports.getMachineData = TryCatch(async (req, res) => {
   const { device_id, design, date, start_date, end_date } = req.query;
-  
+
   try {
     let query = {};
     let responseData = {};
@@ -2419,60 +2440,60 @@ exports.getMachineData = TryCatch(async (req, res) => {
     if (device_id) {
       query.device_id = device_id;
     }
-    
+
     if (design) {
       query.design = design;
     }
-    
+
     if (date) {
       // Single date query - more flexible date handling
       const dateObj = new Date(date);
-      
+
       // Check if date is valid
       if (isNaN(dateObj.getTime())) {
         return res.status(400).json({
           success: false,
-          message: "Invalid date format. Use YYYY-MM-DD"
+          message: "Invalid date format. Use YYYY-MM-DD",
         });
       }
-      
+
       // Create date range for the entire day
       const startDate = new Date(dateObj);
       startDate.setHours(0, 0, 0, 0);
-      
+
       const endDate = new Date(dateObj);
       endDate.setHours(23, 59, 59, 999);
-      
+
       // Try multiple timestamp formats
       query.$or = [
         // Format 1: ISO string comparison
         {
           timestamp: {
             $gte: startDate.toISOString(),
-            $lte: endDate.toISOString()
-          }
+            $lte: endDate.toISOString(),
+          },
         },
         // Format 2: Date object comparison (if timestamp is stored as Date)
         {
           timestamp: {
             $gte: startDate,
-            $lte: endDate
-          }
+            $lte: endDate,
+          },
         },
         // Format 3: String comparison (if timestamp is stored as string)
         {
           timestamp: {
             $regex: `^${date}`,
-            $options: 'i'
-          }
-        }
+            $options: "i",
+          },
+        },
       ];
-      
+
       console.log("📅 Date query created:", {
         date: date,
         startDate: startDate.toISOString(),
         endDate: endDate.toISOString(),
-        query: query.$or
+        query: query.$or,
       });
     } else if (start_date && end_date) {
       // Date range query
@@ -2480,7 +2501,7 @@ exports.getMachineData = TryCatch(async (req, res) => {
       const endDate = new Date(end_date + "T23:59:59.999Z");
       query.timestamp = {
         $gte: startDate.toISOString(),
-        $lte: endDate.toISOString()
+        $lte: endDate.toISOString(),
       };
     }
 
@@ -2488,7 +2509,8 @@ exports.getMachineData = TryCatch(async (req, res) => {
     if (Object.keys(query).length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Please provide at least one parameter: device_id, design, date, or start_date+end_date"
+        message:
+          "Please provide at least one parameter: device_id, design, date, or start_date+end_date",
       });
     }
 
@@ -2502,8 +2524,8 @@ exports.getMachineData = TryCatch(async (req, res) => {
         data: {
           query_params: req.query,
           records: [],
-          summary: {}
-        }
+          summary: {},
+        },
       });
     }
 
@@ -2528,16 +2550,15 @@ exports.getMachineData = TryCatch(async (req, res) => {
       data: {
         query_params: req.query,
         total_records: records.length,
-        ...responseData
-      }
+        ...responseData,
+      },
     });
-
   } catch (error) {
     console.error("Error fetching machine data:", error);
     res.status(500).json({
       success: false,
       message: "Error fetching machine data",
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -2664,20 +2685,24 @@ async function generateDeviceResponse(records, deviceId) {
   const totalError2 = records.reduce((sum, record) => sum + (record.error2 || 0), 0);
   
   // Count ON/OFF cycles
-  const onOffCycles = completeStatusTimeline.filter(period => period.status === 'ON').length;
-  const offOnCycles = completeStatusTimeline.filter(period => period.status === 'OFF').length;
-  
+  const onOffCycles = completeStatusTimeline.filter(
+    (period) => period.status === "ON"
+  ).length;
+  const offOnCycles = completeStatusTimeline.filter(
+    (period) => period.status === "OFF"
+  ).length;
+
   // Calculate total ON and OFF time
   const totalOnTime = completeStatusTimeline
-    .filter(period => period.status === 'ON')
+    .filter((period) => period.status === "ON")
     .reduce((total, period) => {
       const start = new Date(period.start_time);
       const end = new Date(period.end_time);
       return total + (end - start);
     }, 0);
-    
+
   const totalOffTime = completeStatusTimeline
-    .filter(period => period.status === 'OFF')
+    .filter((period) => period.status === "OFF")
     .reduce((total, period) => {
       const start = new Date(period.start_time);
       const end = new Date(period.end_time);
@@ -2699,7 +2724,7 @@ async function generateDeviceResponse(records, deviceId) {
       total_off_cycles: offOnCycles,
       total_on_time: totalOnDuration,
       total_off_time: totalOffDuration,
-      total_status_changes: completeStatusTimeline.length
+      total_status_changes: completeStatusTimeline.length,
     },
     total_production: totalProduction,
     avg_efficiency: avgEfficiency,
@@ -2715,23 +2740,38 @@ async function generateDeviceResponse(records, deviceId) {
 
 // Helper function for design-based response
 async function generateDesignResponse(records, design) {
-  const machines = [...new Set(records.map(record => record.device_id))];
-  
+  const machines = [...new Set(records.map((record) => record.device_id))];
+
   const machineProduction = {};
-  machines.forEach(machineId => {
-    const machineRecords = records.filter(record => record.device_id === machineId);
+  machines.forEach((machineId) => {
+    const machineRecords = records.filter(
+      (record) => record.device_id === machineId
+    );
     machineProduction[machineId] = {
-      total_count: machineRecords.reduce((sum, record) => sum + record.count, 0),
-      avg_efficiency: machineRecords.reduce((sum, record) => sum + record.efficiency, 0) / machineRecords.length,
-      total_errors: machineRecords.reduce((sum, record) => sum + record.error1 + record.error2, 0),
-      shifts: [...new Set(machineRecords.map(record => record.shift))],
+      total_count: machineRecords.reduce(
+        (sum, record) => sum + record.count,
+        0
+      ),
+      avg_efficiency:
+        machineRecords.reduce((sum, record) => sum + record.efficiency, 0) /
+        machineRecords.length,
+      total_errors: machineRecords.reduce(
+        (sum, record) => sum + record.error1 + record.error2,
+        0
+      ),
+      shifts: [...new Set(machineRecords.map((record) => record.shift))],
       first_run: machineRecords[0].timestamp,
-      last_run: machineRecords[machineRecords.length - 1].timestamp
+      last_run: machineRecords[machineRecords.length - 1].timestamp,
     };
   });
 
-  const totalProduction = records.reduce((sum, record) => sum + record.count, 0);
-  const avgEfficiency = records.reduce((sum, record) => sum + record.efficiency, 0) / records.length;
+  const totalProduction = records.reduce(
+    (sum, record) => sum + record.count,
+    0
+  );
+  const avgEfficiency =
+    records.reduce((sum, record) => sum + record.efficiency, 0) /
+    records.length;
 
   return {
     design,
@@ -2739,33 +2779,46 @@ async function generateDesignResponse(records, design) {
     machine_production: machineProduction,
     total_production: totalProduction,
     avg_efficiency: avgEfficiency,
-    shifts: [...new Set(records.map(record => record.shift))],
+    shifts: [...new Set(records.map((record) => record.shift))],
     first_run: records[0].timestamp,
-    last_run: records[records.length - 1].timestamp
+    last_run: records[records.length - 1].timestamp,
   };
 }
 
 // Helper function for date-based response
 async function generateDateResponse(records, date) {
-  const machines = [...new Set(records.map(record => record.device_id))];
-  const designs = [...new Set(records.map(record => record.design))];
-  
+  const machines = [...new Set(records.map((record) => record.device_id))];
+  const designs = [...new Set(records.map((record) => record.design))];
+
   const machineSummary = {};
-  machines.forEach(machineId => {
-    const machineRecords = records.filter(record => record.device_id === machineId);
+  machines.forEach((machineId) => {
+    const machineRecords = records.filter(
+      (record) => record.device_id === machineId
+    );
     machineSummary[machineId] = {
-      designs: [...new Set(machineRecords.map(record => record.design))],
-      total_count: machineRecords.reduce((sum, record) => sum + record.count, 0),
-      avg_efficiency: machineRecords.reduce((sum, record) => sum + record.efficiency, 0) / machineRecords.length,
-      total_errors: machineRecords.reduce((sum, record) => sum + record.error1 + record.error2, 0),
-      shifts: [...new Set(machineRecords.map(record => record.shift))],
-      status_changes: machineRecords.length
+      designs: [...new Set(machineRecords.map((record) => record.design))],
+      total_count: machineRecords.reduce(
+        (sum, record) => sum + record.count,
+        0
+      ),
+      avg_efficiency:
+        machineRecords.reduce((sum, record) => sum + record.efficiency, 0) /
+        machineRecords.length,
+      total_errors: machineRecords.reduce(
+        (sum, record) => sum + record.error1 + record.error2,
+        0
+      ),
+      shifts: [...new Set(machineRecords.map((record) => record.shift))],
+      status_changes: machineRecords.length,
     };
   });
 
-  const totalProduction = records.reduce((sum, record) => sum + record.count, 0);
+  const totalProduction = records.reduce(
+    (sum, record) => sum + record.count,
+    0
+  );
   const statusSummary = {};
-  records.forEach(record => {
+  records.forEach((record) => {
     statusSummary[record.status] = (statusSummary[record.status] || 0) + 1;
   });
 
@@ -2776,34 +2829,43 @@ async function generateDateResponse(records, date) {
     machine_summary: machineSummary,
     total_production: totalProduction,
     status_summary: statusSummary,
-    shifts: [...new Set(records.map(record => record.shift))]
+    shifts: [...new Set(records.map((record) => record.shift))],
   };
 }
 
 // Helper function for mixed queries
 async function generateMixedResponse(records, queryParams) {
-  const machines = [...new Set(records.map(record => record.device_id))];
-  const designs = [...new Set(records.map(record => record.design))];
-  
+  const machines = [...new Set(records.map((record) => record.device_id))];
+  const designs = [...new Set(records.map((record) => record.design))];
+
   // Generate summary based on what's being queried
   let summary = {
     total_records: records.length,
     total_production: records.reduce((sum, record) => sum + record.count, 0),
     machines,
-    designs
+    designs,
   };
 
   // Add specific data based on query type
   if (queryParams.device_id) {
-    summary.device_data = await generateDeviceResponse(records, queryParams.device_id);
+    summary.device_data = await generateDeviceResponse(
+      records,
+      queryParams.device_id
+    );
   }
-  
+
   if (queryParams.design) {
-    summary.design_data = await generateDesignResponse(records, queryParams.design);
+    summary.design_data = await generateDesignResponse(
+      records,
+      queryParams.design
+    );
   }
-  
+
   if (queryParams.date || queryParams.start_date) {
-    summary.date_data = await generateDateResponse(records, queryParams.date || queryParams.start_date);
+    summary.date_data = await generateDateResponse(
+      records,
+      queryParams.date || queryParams.start_date
+    );
   }
 
   return summary;
@@ -2814,10 +2876,10 @@ function getDuration(startTime, endTime) {
   const start = new Date(startTime);
   const end = new Date(endTime);
   const diffMs = end - start;
-  
+
   const hours = Math.floor(diffMs / (1000 * 60 * 60));
   const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-  
+
   return `${hours}h ${minutes}m`;
 }
 
@@ -2825,29 +2887,31 @@ function getDuration(startTime, endTime) {
 exports.debugMachineData = TryCatch(async (req, res) => {
   try {
     const totalRecords = await MachineStatus.countDocuments({});
-    const sampleRecords = await MachineStatus.find({}).limit(5).sort({ timestamp: -1 });
-    
+    const sampleRecords = await MachineStatus.find({})
+      .limit(5)
+      .sort({ timestamp: -1 });
+
     res.status(200).json({
       success: true,
       message: "Database debug info",
       data: {
         total_records: totalRecords,
-        sample_records: sampleRecords.map(record => ({
+        sample_records: sampleRecords.map((record) => ({
           _id: record._id,
           device_id: record.device_id,
           design: record.design,
           status: record.status,
           timestamp: record.timestamp,
           timestamp_type: typeof record.timestamp,
-          created_at: record.createdAt
-        }))
-      }
+          created_at: record.createdAt,
+        })),
+      },
     });
   } catch (error) {
     res.status(500).json({
       success: false,
       message: "Error in debug endpoint",
-      error: error.message
+      error: error.message,
     });
   }
 });
