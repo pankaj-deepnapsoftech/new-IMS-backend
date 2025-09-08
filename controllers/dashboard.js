@@ -2401,7 +2401,7 @@ exports.machineStatus = TryCatch(async (req, res) => {
 // this is the api which will show the results in the dashboard
 //It has 5 parts
 // http://localhost:8085/api/dashboard/machine-data?date=2025-09-04   //for date query
-// http://localhost:8085/api/dashboard/machine-data?design=Design123   // for Design query
+http://localhost:8085/api/dashboard/machine-data?design=Design123   // for Design query
 // http://localhost:8085/api/dashboard/machine-data?device_id=PC-001    // for machine query
 // http://localhost:5000/api/dashboard/machine-data?device_id=PC-001&design=Design123& date=2025-09-04  // for mixed query, when we have all query parameter
 
@@ -2546,52 +2546,122 @@ exports.getMachineData = TryCatch(async (req, res) => {
 async function generateDeviceResponse(records, deviceId) {
   const designs = [...new Set(records.map(record => record.design))];
   
-  // Create complete status timeline with all ON/OFF changes
+  // Create design-wise status timeline
+  const designWiseTimeline = {};
   const completeStatusTimeline = [];
-  let currentStatus = null;
-  let startTime = null;
   
-  // Sort records by timestamp to ensure chronological order
-  const sortedRecords = records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  
-  sortedRecords.forEach((record, index) => {
-    if (currentStatus !== record.status) {
-      // Save previous status period if exists
-      if (currentStatus && startTime) {
-        const endTime = sortedRecords[index - 1]?.timestamp || record.timestamp;
-        completeStatusTimeline.push({
-          status: currentStatus,
-          start_time: startTime,
-          end_time: endTime,
-          duration: getDuration(startTime, endTime),
-          design: sortedRecords[index - 1]?.design || record.design,
-          shift: sortedRecords[index - 1]?.shift || record.shift
-        });
+  // Process each design separately
+  designs.forEach(design => {
+    const designRecords = records.filter(record => record.design === design);
+    const sortedDesignRecords = designRecords.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    const designTimeline = [];
+    let currentStatus = null;
+    let startTime = null;
+    
+    sortedDesignRecords.forEach((record, index) => {
+      if (currentStatus !== record.status) {
+        // Save previous status period if exists
+        if (currentStatus && startTime) {
+          const endTime = sortedDesignRecords[index - 1]?.timestamp || record.timestamp;
+          const timelineEntry = {
+            status: currentStatus,
+            start_time: startTime,
+            end_time: endTime,
+            duration: getDuration(startTime, endTime),
+            design: design,
+            shift: sortedDesignRecords[index - 1]?.shift || record.shift,
+            error1: sortedDesignRecords[index - 1]?.error1 || record.error1 || 0,
+            error2: sortedDesignRecords[index - 1]?.error2 || record.error2 || 0,
+            count: sortedDesignRecords[index - 1]?.count || record.count || 0,
+            efficiency: sortedDesignRecords[index - 1]?.efficiency || record.efficiency || 0
+          };
+          designTimeline.push(timelineEntry);
+          completeStatusTimeline.push(timelineEntry);
+        }
+        
+        // Start new status period
+        currentStatus = record.status;
+        startTime = record.timestamp;
       }
-      
-      // Start new status period
-      currentStatus = record.status;
-      startTime = record.timestamp;
+    });
+    
+    // Add the last status period for this design
+    if (currentStatus && startTime && sortedDesignRecords.length > 0) {
+      const lastRecord = sortedDesignRecords[sortedDesignRecords.length - 1];
+      const timelineEntry = {
+        status: currentStatus,
+        start_time: startTime,
+        end_time: lastRecord.timestamp,
+        duration: getDuration(startTime, lastRecord.timestamp),
+        design: design,
+        shift: lastRecord.shift,
+        error1: lastRecord.error1 || 0,
+        error2: lastRecord.error2 || 0,
+        count: lastRecord.count || 0,
+        efficiency: lastRecord.efficiency || 0
+      };
+      designTimeline.push(timelineEntry);
+      completeStatusTimeline.push(timelineEntry);
     }
+    
+    designWiseTimeline[design] = designTimeline;
   });
   
-  // Add the last status period
-  if (currentStatus && startTime) {
-    const lastRecord = sortedRecords[sortedRecords.length - 1];
-    completeStatusTimeline.push({
-      status: currentStatus,
-      start_time: startTime,
-      end_time: lastRecord.timestamp,
-      duration: getDuration(startTime, lastRecord.timestamp),
-      design: lastRecord.design,
-      shift: lastRecord.shift
-    });
-  }
+  // Sort complete timeline by timestamp
+  completeStatusTimeline.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
-  // Calculate statistics
+  // Calculate design-wise statistics
+  const designWiseStats = {};
+  designs.forEach(design => {
+    const designRecords = records.filter(record => record.design === design);
+    const designTimeline = designWiseTimeline[design];
+    
+    const designProduction = designRecords.reduce((sum, record) => sum + record.count, 0);
+    const designAvgEfficiency = designRecords.length > 0 ? designRecords.reduce((sum, record) => sum + record.efficiency, 0) / designRecords.length : 0;
+    const designTotalErrors = designRecords.reduce((sum, record) => sum + record.error1 + record.error2, 0);
+    
+    // Calculate ON/OFF time for this design
+    const designOnTime = designTimeline
+      .filter(period => period.status === 'ON')
+      .reduce((total, period) => {
+        const start = new Date(period.start_time);
+        const end = new Date(period.end_time);
+        return total + (end - start);
+      }, 0);
+      
+    const designOffTime = designTimeline
+      .filter(period => period.status === 'OFF')
+      .reduce((total, period) => {
+        const start = new Date(period.start_time);
+        const end = new Date(period.end_time);
+        return total + (end - start);
+      }, 0);
+    
+    // Calculate individual error counts for this design
+    const designError1 = designRecords.reduce((sum, record) => sum + (record.error1 || 0), 0);
+    const designError2 = designRecords.reduce((sum, record) => sum + (record.error2 || 0), 0);
+    
+    designWiseStats[design] = {
+      total_production: designProduction,
+      avg_efficiency: designAvgEfficiency,
+      total_errors: designTotalErrors,
+      error1_count: designError1,
+      error2_count: designError2,
+      total_on_time: getDuration(0, designOnTime),
+      total_off_time: getDuration(0, designOffTime),
+      on_cycles: designTimeline.filter(period => period.status === 'ON').length,
+      off_cycles: designTimeline.filter(period => period.status === 'OFF').length,
+      total_records: designRecords.length
+    };
+  });
+
+  // Calculate overall statistics
   const totalProduction = records.reduce((sum, record) => sum + record.count, 0);
   const avgEfficiency = records.reduce((sum, record) => sum + record.efficiency, 0) / records.length;
-  const totalErrors = records.reduce((sum, record) => sum + record.error1 + record.error2, 0);
+  const totalErrors = records.reduce((sum, record) => sum + (record.error1 || 0) + (record.error2 || 0), 0);
+  const totalError1 = records.reduce((sum, record) => sum + (record.error1 || 0), 0);
+  const totalError2 = records.reduce((sum, record) => sum + (record.error2 || 0), 0);
   
   // Count ON/OFF cycles
   const onOffCycles = completeStatusTimeline.filter(period => period.status === 'ON').length;
@@ -2622,6 +2692,8 @@ async function generateDeviceResponse(records, deviceId) {
     device_id: deviceId,
     designs,
     complete_status_timeline: completeStatusTimeline,
+    design_wise_timeline: designWiseTimeline,
+    design_wise_stats: designWiseStats,
     status_summary: {
       total_on_cycles: onOffCycles,
       total_off_cycles: offOnCycles,
@@ -2632,9 +2704,11 @@ async function generateDeviceResponse(records, deviceId) {
     total_production: totalProduction,
     avg_efficiency: avgEfficiency,
     total_errors: totalErrors,
+    error1_count: totalError1,
+    error2_count: totalError2,
     shifts: [...new Set(records.map(record => record.shift))],
-    first_record: sortedRecords[0].timestamp,
-    last_record: sortedRecords[sortedRecords.length - 1].timestamp,
+    first_record: records.length > 0 ? records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[0].timestamp : null,
+    last_record: records.length > 0 ? records.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))[records.length - 1].timestamp : null,
     total_records: records.length
   };
 }
