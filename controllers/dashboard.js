@@ -695,7 +695,7 @@ exports.summary = TryCatch(async (req, res) => {
   });
 });
 
-exports.salesData = TryCatch(async (req, res) => {
+exports.  salesData = TryCatch(async (req, res) => {
   const view = req.query.view || "yearly"; // Default yearly
   const currentYear = new Date().getFullYear();
   const prevYear = currentYear - 1;
@@ -1839,7 +1839,8 @@ exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: currStart, $lt: currEnd },
-        dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        // dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        $expr: { $eq: ["$quantity", "$dispatch_qty"] },
       },
     },
     {
@@ -1855,7 +1856,8 @@ exports.getMonthlySalesAndDelivered = TryCatch(async (req, res, next) => {
     {
       $match: {
         createdAt: { $gte: prevStart, $lt: prevEnd },
-        dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        // dispatch_status: { $regex: "^Delivered$", $options: "i" }, // Case-insensitive match for "Delivered"
+        $expr: { $eq: ["$quantity", "$dispatch_qty"] },
       },
     },
     {
