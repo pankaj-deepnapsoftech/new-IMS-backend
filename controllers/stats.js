@@ -15,7 +15,7 @@ exports.getStats = TryCatch(async (req, res) => {
   // ==== BOM Counts ====
   const totalBOM = await BOM.countDocuments();
   const lastMonthBOM = await BOM.countDocuments({
-    createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
+    createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },  
   });
   const thisMonthBOM = await BOM.countDocuments({
     createdAt: { $gte: startOfThisMonth, $lte: endOfThisMonth },
@@ -27,7 +27,7 @@ exports.getStats = TryCatch(async (req, res) => {
     isVerified: true,
     createdAt: { $gte: startOfLastMonth, $lte: endOfLastMonth },
   });
-  const thisMonthVerifiedEmployees = await User.countDocuments({
+  const thisMonthVerifiedEmployees = await User.countDocuments({ 
     isVerified: true,
     createdAt: { $gte: startOfThisMonth, $lte: endOfThisMonth },
   });

@@ -3,6 +3,7 @@ const { summary,salesData,dispatchData,financialSummary, dashboardWithFilter, ge
 const { isAuthenticated } = require('../middlewares/isAuthenticated');
 const { isSuper } = require('../middlewares/isSuper');
 const { getStats } = require('../controllers/stats');
+const { getInventoryStats } = require('../controllers/inventory_dashboard_stats');
 const router = express.Router();
 
 
@@ -16,6 +17,8 @@ router.get('/get-machine-list',getAllMachines)
 
 router.get('/', isAuthenticated, isSuper, dashboardWithFilter);
 router.get('/welcome', isAuthenticated, getWelcomeMessage);
+
+router.get("/inventory-stats", isAuthenticated, getInventoryStats);
 
 
 

@@ -34,7 +34,7 @@ router
   .post(isUserVerified, loginWithPassword);
 router
   .route("/user")
-  .get(isAuthenticated, isAllowed, details)
+  .get(isAuthenticated, details)
   .put(isAuthenticated, isSuper, update)
   .delete(isAuthenticated, isSuper, remove);
 router.post("/reset-password-request", isUserVerified, resetPasswordRequest);
