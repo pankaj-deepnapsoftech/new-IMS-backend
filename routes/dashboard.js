@@ -10,7 +10,7 @@ const router = express.Router();
 router.get('/sales', isAuthenticated, isSuper,salesData);
 router.get('/dispatch', isAuthenticated, isSuper,dispatchData);
 router.get('/finance', isAuthenticated, isSuper,financialSummary);
-router.get('/sales-delivered', isAuthenticated, isSuper,getMonthlySalesAndDelivered);
+router.get('/sales-delivered', isAuthenticated,getMonthlySalesAndDelivered);
 router.get("/stats", isAuthenticated, getStats);
 router.get('/get-data-from-machine',machineStatus);
 // router.get('/get-machine-list',getAllMachines) // Commented out as function is disabled
