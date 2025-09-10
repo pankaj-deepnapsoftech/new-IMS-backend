@@ -49,6 +49,7 @@ const productionProcessSchema = new Schema(
         "moved to inventory",
         "allocated finish goods",
         "out finish goods",
+        "production paused",
         "received",
         "dispatched"
       ],
