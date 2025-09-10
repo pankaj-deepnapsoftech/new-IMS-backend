@@ -8,7 +8,7 @@ const { Validater } = require("../validation/Validator");
 const { BOMValidation } = require("../validation/bom.validation");
 const router = express.Router();
 
-router.post("/", isAuthenticated, isAllowed, Validater(BOMValidation), create);
+router.post("/", isAuthenticated, Validater(BOMValidation), create);
 router.get("/all", all);
 router.get("/unapproved", isAuthenticated, isSuper, unapproved);
 // router.get('/approved', isAuthenticated, isSuper, approved);
@@ -53,8 +53,8 @@ router.delete("/bulk-delete", isAuthenticated, isSuper, bulkRemove);
 router
   .route("/:id")
   .delete(isAuthenticated, isAllowed, remove)
-  .get(isAuthenticated, isAllowed, details)
-  .put(isAuthenticated, isAllowed, update);
+  .get(isAuthenticated, details)
+  .put(isAuthenticated, update);
 //   router.get(
 //   "/all/inventory/finished-goods",
 //   isAuthenticated,

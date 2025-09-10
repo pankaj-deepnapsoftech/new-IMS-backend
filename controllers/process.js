@@ -90,7 +90,7 @@ const bomDoc = await BOM.findById(bom._id)
     populate: { path: "item", model: "Product" }
   });
 
-
+ 
 
 if (!bomDoc) {
   throw new ErrorHandler("BOM not found", 404);
@@ -392,7 +392,7 @@ await Promise.all(
   // If any changes detected and status is not "production started", set to "work in progress"
  
  
-  if (hasChanges && productionProcess.status === "production started") {
+  if (hasChanges && (productionProcess.status === "production started" || productionProcess.status === "production paused")) {
     productionProcess.status = "production in progress";
   } else if (
     productionProcess.status !== "production started" &&
@@ -404,8 +404,8 @@ await Promise.all(
   } else {
     console.log("No status change needed");
   }
-
-  // Mark nested updates
+  
+  // Mark nested updates 
   productionProcess.markModified("finished_good");
   productionProcess.markModified("raw_materials");
   productionProcess.markModified("scrap_materials");
