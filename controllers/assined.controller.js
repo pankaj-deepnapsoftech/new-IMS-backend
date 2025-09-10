@@ -1,4 +1,5 @@
 const { AssinedModel } = require("../models/Assined-to.model");
+const moment = require("moment");
 // const { Notification } = require("../models/notification");
 const { TryCatch } = require("../utils/error");
 
@@ -10,8 +11,7 @@ const assinedTask = TryCatch(async (req, res) => {
       message: "task is already assined"
     })
   }
-  console.log('assign task data', data);
-  console.log('assign task data =', req?.user._id);
+  
   const value = await AssinedModel.create({ ...data, assined_by: req?.user._id });
 
   // await Notification.create({
@@ -201,6 +201,54 @@ const CountTotal = TryCatch(async (req, res) => {
 });
 
 
+const DashboardStats = TryCatch(async (req, res) => {
+  const { _id } = req.user;
+
+  // ==== Calculate date ranges ====
+  const now = moment();
+  const startOfThisMonth = now.clone().startOf("month").toDate();
+  const endOfThisMonth = now.clone().endOf("month").toDate();
+
+  const startOfLastMonth = now.clone().subtract(1, "month").startOf("month").toDate();
+  const endOfLastMonth = now.clone().subtract(1, "month").endOf("month").toDate();
+
+  // ==== Common match (only my tasks: assigned to or by me) ====
+  const baseMatch = {
+    $or: [{ assined_to: _id }, { assined_by: _id }]
+  };
+
+  // ==== Helper function to get counts ====
+  const getCounts = async (start, end) => {
+    const data = await AssinedModel.aggregate([
+      { $match: { ...baseMatch, createdAt: { $gte: start, $lte: end } } },
+      {
+        $group: {
+          _id: "$isCompleted",
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // convert array to object like { Pending: 3, UnderProcessing: 2, Completed: 5 }
+    const counts = { total: 0, Pending: 0, UnderProcessing: 0, Completed: 0 };
+    data.forEach(d => {
+      counts[d._id] = d.count;
+      counts.total += d.count;
+    });
+    return counts;
+  };
+
+  // ==== Get this month & last month data ====
+  const thisMonth = await getCounts(startOfThisMonth, endOfThisMonth);
+  const lastMonth = await getCounts(startOfLastMonth, endOfLastMonth);
+
+  return res.status(200).json({
+    message: "Dashboard data fetched",
+    thisMonth,
+    lastMonth
+  });
+});
+
 
 
 module.exports = {
@@ -209,5 +257,6 @@ module.exports = {
   updateAssinedTask,
   DeleteAssinedTask,
   UpdateDesignStatus,
-  CountTotal
+  CountTotal,
+  DashboardStats
 };
