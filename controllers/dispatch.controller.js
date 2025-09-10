@@ -404,3 +404,19 @@ exports.DownloadFile = TryCatch(async (req, res) => {
 
   res.download(filePath, fileData.originalName);
 });
+
+exports.Stats = TryCatch(async (req, res) => {
+  const totalDispatches = await DispatchModel.countDocuments();
+  const dispatchedCount = await DispatchModel.countDocuments({ dispatch_status: "Dispatch" });
+  const deliveredCount = await DispatchModel.countDocuments({ dispatch_status: "Delivered" });
+  const pendingCount = await DispatchModel.countDocuments({ dispatch_status: "Dispatch Pending" });
+  return res.status(200).json({
+    message: "Dispatch statistics retrieved successfully",
+    data: {
+      totalDispatches,
+      dispatchedCount,
+      deliveredCount,
+      pendingCount,
+    },
+  });
+});

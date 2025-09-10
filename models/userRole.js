@@ -33,6 +33,7 @@ const userRoleSchema = new Schema(
           "task",
           "bom",
           "merchant",
+          "dispatch"
         ],
         message:
           "Permissions should be one of the following: product, store, approval, agent, bom",
