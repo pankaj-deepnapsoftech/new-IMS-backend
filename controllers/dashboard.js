@@ -695,7 +695,7 @@ exports.summary = TryCatch(async (req, res) => {
   });
 });
 
-exports.  salesData = TryCatch(async (req, res) => {
+exports.salesData = TryCatch(async (req, res) => {
   const view = req.query.view || "yearly"; // Default yearly
   const currentYear = new Date().getFullYear();
   const prevYear = currentYear - 1;
@@ -2917,6 +2917,8 @@ exports.debugMachineData = TryCatch(async (req, res) => {
 });
 
 
+
+
 ///api for production dashboard
 exports.getProductionDashboard = TryCatch(async (req, res) => {
   const now = moment();
@@ -3015,3 +3017,208 @@ exports.getProductionDashboard = TryCatch(async (req, res) => {
     production_chart: chartData, // 👈 Added chart data from current month
   });
 });
+
+
+// api for accountant dashboard
+
+exports.accountantDashboard = TryCatch(async (req, res) => {
+  const today = moment();
+  const currentMonthStart = today.clone().startOf("month").startOf("day");
+  const currentDate = today.clone().endOf("day");
+
+  const previousMonthStart = today.clone().subtract(1, "month").startOf("month");
+  const previousMonthEnd = today.clone().subtract(1, "month").endOf("month");
+
+  const currentMonthCondition = {
+    createdAt: {
+      $gte: currentMonthStart.toDate(),
+      $lte: currentDate.toDate(),
+    },
+  };
+
+  const previousMonthCondition = {
+    createdAt: {
+      $gte: previousMonthStart.toDate(),
+      $lte: previousMonthEnd.toDate(),
+    },
+  };
+
+  // ===== CURRENT MONTH =====
+  const totalProformaInvoices = await ProformaInvoice.countDocuments(currentMonthCondition);
+  const proformaAmountAgg = await ProformaInvoice.aggregate([
+    { $match: currentMonthCondition },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: "$total_amount" },
+      },
+    },
+  ]);
+  const totalProformaAmount = proformaAmountAgg[0]?.totalAmount || 0;
+
+  const proformaStatusAgg = await ProformaInvoice.aggregate([
+    { $match: currentMonthCondition },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+        totalAmount: { $sum: "$total_amount" },
+      },
+    },
+  ]);
+
+  const totalInvoices = await Invoice.countDocuments(currentMonthCondition);
+  const invoiceAmountAgg = await Invoice.aggregate([
+    { $match: currentMonthCondition },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: "$total" },
+      },
+    },
+  ]);
+  const totalInvoiceAmount = invoiceAmountAgg[0]?.totalAmount || 0;
+
+  const invoiceStatusAgg = await Invoice.aggregate([
+    { $match: currentMonthCondition },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+        totalAmount: { $sum: "$total" },
+      },
+    },
+  ]);
+
+  const totalPayments = await Payment.countDocuments(currentMonthCondition);
+  const paymentAmountAgg = await Payment.aggregate([
+    { $match: currentMonthCondition },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: "$amount" },
+      },
+    },
+  ]);
+  const totalPaymentAmount = paymentAmountAgg[0]?.totalAmount || 0;
+
+  const paymentStatusAgg = await Payment.aggregate([
+    { $match: currentMonthCondition },
+    {
+      $group: {
+        _id: "$status",
+        count: { $sum: 1 },
+        totalAmount: { $sum: "$amount" },
+      },
+    },
+  ]);
+
+  // ===== PREVIOUS MONTH =====
+  const prevTotalProformaInvoices = await ProformaInvoice.countDocuments(previousMonthCondition);
+  const prevProformaAmountAgg = await ProformaInvoice.aggregate([
+    { $match: previousMonthCondition },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: "$total_amount" },
+      },
+    },
+  ]);
+  const prevTotalProformaAmount = prevProformaAmountAgg[0]?.totalAmount || 0;
+
+  const prevTotalInvoices = await Invoice.countDocuments(previousMonthCondition);
+  const prevInvoiceAmountAgg = await Invoice.aggregate([
+    { $match: previousMonthCondition },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: "$total" },
+      },
+    },
+  ]);
+  const prevTotalInvoiceAmount = prevInvoiceAmountAgg[0]?.totalAmount || 0;
+
+  const prevTotalPayments = await Payment.countDocuments(previousMonthCondition);
+  const prevPaymentAmountAgg = await Payment.aggregate([
+    { $match: previousMonthCondition },
+    {
+      $group: {
+        _id: null,
+        totalAmount: { $sum: "$amount" },
+      },
+    },
+  ]);
+  const prevTotalPaymentAmount = prevPaymentAmountAgg[0]?.totalAmount || 0;
+
+  // ===== RESPONSE =====
+  res.status(200).json({
+    status: 200,
+    success: true,
+    message: "Financial summary for current and previous month",
+
+    date_ranges: {
+      current_month: {
+        from: currentMonthStart.format("YYYY-MM-DD"),
+        to: currentDate.format("YYYY-MM-DD"),
+      },
+      previous_month: {
+        from: previousMonthStart.format("YYYY-MM-DD"),
+        to: previousMonthEnd.format("YYYY-MM-DD"),
+      },
+    },
+
+    // Current Month Summary
+    current_month: {
+      proforma_invoices: {
+        total_count: totalProformaInvoices,
+        total_amount: totalProformaAmount,
+        status_wise: proformaStatusAgg.reduce((acc, item) => {
+          acc[item._id || "unknown"] = {
+            count: item.count,
+            amount: item.totalAmount,
+          };
+          return acc;
+        }, {}),
+      },
+      invoices: {
+        total_count: totalInvoices,
+        total_amount: totalInvoiceAmount,
+        status_wise: invoiceStatusAgg.reduce((acc, item) => {
+          acc[item._id || "unknown"] = {
+            count: item.count,
+            amount: item.totalAmount,
+          };
+          return acc;
+        }, {}),
+      },
+      payments: {
+        total_count: totalPayments,
+        total_amount: totalPaymentAmount,
+        status_wise: paymentStatusAgg.reduce((acc, item) => {
+          acc[item._id || "unknown"] = {
+            count: item.count,
+            amount: item.totalAmount,
+          };
+          return acc;
+        }, {}),
+      },
+    },
+
+    // Previous Month Summary
+    previous_month: {
+      proforma_invoices: {
+        total_count: prevTotalProformaInvoices,
+        total_amount: prevTotalProformaAmount,
+      },
+      invoices: {
+        total_count: prevTotalInvoices,
+        total_amount: prevTotalInvoiceAmount,
+      },
+      payments: {
+        total_count: prevTotalPayments,
+        total_amount: prevTotalPaymentAmount,
+      },
+    },
+  });
+});
+ 
