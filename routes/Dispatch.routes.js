@@ -14,6 +14,7 @@ const {
   UploadDeliveryProof,
   UploadInvoice,
   DownloadFile,
+  Stats,
 } = require("../controllers/dispatch.controller");
 
 const uploadsDir = path.join(__dirname, "../uploads");
@@ -71,5 +72,7 @@ routes
   .route("/upload-invoice/:id")
   .post(isAuthenticated, upload.single("invoice"), UploadInvoice);
 routes.route("/download/:id/:type").get(isAuthenticated, DownloadFile);
+
+routes.route("/dispatch-stats").get(isAuthenticated, Stats);
 
 module.exports = routes;
